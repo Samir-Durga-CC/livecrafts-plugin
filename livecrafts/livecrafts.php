@@ -2,14 +2,14 @@
 /**
  * Plugin Name: Livecrafts
  * Description: Click any element on any page and edit its text and style visually. Works on any theme or page builder because edits are saved as non-destructive "patches" (CSS + text) instead of changing theme files.
- * Version: 0.7.0
+ * Version: 0.8.0
  * Author: Livecrafts
  * Text Domain: livecrafts
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'LIVECRAFTS_VERSION', '0.7.0' );
+define( 'LIVECRAFTS_VERSION', '0.8.0' );
 define( 'LIVECRAFTS_DIR', plugin_dir_path( __FILE__ ) );
 define( 'LIVECRAFTS_URL', plugin_dir_url( __FILE__ ) );
 
@@ -20,6 +20,7 @@ require_once LIVECRAFTS_DIR . 'includes/rest.php';
 require_once LIVECRAFTS_DIR . 'includes/audit.php';
 require_once LIVECRAFTS_DIR . 'includes/bridge.php';
 require_once LIVECRAFTS_DIR . 'includes/theme-files.php';
+require_once LIVECRAFTS_DIR . 'includes/assistant.php';
 require_once LIVECRAFTS_DIR . 'includes/admin.php';
 
 /**
@@ -67,7 +68,7 @@ add_action( 'wp_footer', function () {
  * 3) The editor itself -> only for logged-in editors.
  */
 add_action( 'wp_enqueue_scripts', function () {
-	if ( is_admin() || ! livecrafts_user_can_edit() ) return;
+	if ( is_admin() || ! livecrafts_user_can_edit() || ! livecrafts_classic_enabled() ) return; // the chat widget replaces it unless turned on
 
 	wp_enqueue_media(); // WordPress Media Library picker (wp.media) for image fields
 	wp_enqueue_script( 'livecrafts-editor', LIVECRAFTS_URL . 'assets/editor.js', array(), LIVECRAFTS_VERSION, true );

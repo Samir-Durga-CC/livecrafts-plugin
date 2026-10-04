@@ -30,7 +30,7 @@ function livecrafts_rest_ping() {
 			'acf'       => function_exists( 'get_field' ),
 			'elementor' => function_exists( 'livecrafts_el_active' ) && livecrafts_el_active(),
 			'targets'   => array( 'acf', 'el' ),
-			'endpoints' => array( 'ping', 'map', 'target', 'debug/target', 'debug/fields', 'debug/elementor', 'debug/locate', 'undo', 'save', 'revert', 'theme-files', 'theme-file' ),
+			'endpoints' => array( 'ping', 'map', 'target', 'debug/target', 'debug/fields', 'debug/elementor', 'debug/locate', 'undo', 'save', 'revert', 'theme-files', 'theme-file', 'assistant' ),
 			'theme_files' => current_user_can( 'edit_themes' ),
 			'theme'       => get_stylesheet(),
 			'block_theme' => function_exists( 'wp_is_block_theme' ) ? wp_is_block_theme() : false,
