@@ -55,6 +55,8 @@ function livecrafts_allowed_props() {
 		'font-size', 'font-weight', 'font-family', 'font-style', 'text-align', 'text-decoration', 'text-transform',
 		'letter-spacing', 'line-height', 'padding', 'margin', 'border-radius', 'opacity',
 		'width', 'max-width', 'height', 'min-height', 'display', 'gap',
+		'padding-top', 'padding-right', 'padding-bottom', 'padding-left', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
+		'border-color', 'border-width', 'border-style', 'box-shadow', 'justify-content', 'align-items', 'flex-direction',
 	);
 }
 
@@ -93,16 +95,21 @@ function livecrafts_clean_styles( $styles ) {
 }
 
 function livecrafts_build_css( $patches ) {
-	$css = '';
+	$all = ''; $tablet = ''; $mobile = '';
 	foreach ( $patches as $sel => $patch ) {
-		if ( empty( $patch['styles'] ) || ! is_array( $patch['styles'] ) ) continue;
 		$sel = livecrafts_clean_selector( $sel );
-		if ( $sel === '' ) continue;
-		$decl = array();
-		foreach ( livecrafts_clean_styles( $patch['styles'] ) as $p => $v ) $decl[] = $p . ':' . $v . ' !important';
-		if ( $decl ) $css .= $sel . '{' . implode( ';', $decl ) . "}\n";
+		if ( $sel === '' || ! is_array( $patch ) ) continue;
+		foreach ( array( 'styles' => 'all', 'styles_tablet' => 'tablet', 'styles_mobile' => 'mobile' ) as $k => $where ) {
+			if ( empty( $patch[ $k ] ) || ! is_array( $patch[ $k ] ) ) continue;
+			$decl = array();
+			foreach ( livecrafts_clean_styles( $patch[ $k ] ) as $p => $v ) $decl[] = $p . ':' . $v . ' !important';
+			if ( ! $decl ) continue;
+			$rule = $sel . '{' . implode( ';', $decl ) . "}\n";
+			if ( $where === 'all' ) $all .= $rule; elseif ( $where === 'tablet' ) $tablet .= $rule; else $mobile .= $rule;
+		}
 	}
-	return $css;
+	// Mobile last so it wins over tablet on small screens.
+	return $all . ( $tablet ? "@media (max-width:1024px){\n" . $tablet . "}\n" : '' ) . ( $mobile ? "@media (max-width:767px){\n" . $mobile . "}\n" : '' );
 }
 
 function livecrafts_text_patches( $patches ) {

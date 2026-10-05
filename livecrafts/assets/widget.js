@@ -172,6 +172,7 @@
 		for (var i = 0; i < PROPS.length; i++) styles[PROPS[i]] = cs.getPropertyValue(PROPS[i]);
 		var r = el.getBoundingClientRect();
 		var img = el.tagName === "IMG" ? el : el.querySelector && el.querySelector("img");
+		var similar = similarOf(el);
 		return {
 			selector: uniqueSelector(el), label: describe(el), tag: el.tagName.toLowerCase(),
 			id: el.id || "", classes: Array.prototype.slice.call(el.classList).filter(function (c) { return c.indexOf("lcw-") !== 0; }).join(" "),
@@ -180,8 +181,26 @@
 			image: img ? { src: img.currentSrc || img.src, alt: img.alt || "" } : null,
 			link: el.closest && el.closest("a") ? el.closest("a").href : "",
 			styles: styles, rect: { width: Math.round(r.width), height: Math.round(r.height) },
-			section: sectionOf(el), pageUrl: location.href.split("#")[0], viewport: window.innerWidth,
+			section: sectionOf(el), pageUrl: location.href.split("#")[0].replace(/[?&]lcv=\d+/, ""), viewport: window.innerWidth,
+			pageKey: C.pageKey || "", elementor: elementorOf(el), hasChildren: hasMarkup(el),
+			similarSelector: similar.selector, similarCount: similar.count,
 		};
+	}
+	/** The Elementor widget an element belongs to (its id + the page it is stored on) - lets text/images be edited at the source. */
+	function elementorOf(el) {
+		var w = el.closest && el.closest(".elementor-element[data-id]");
+		var doc = el.closest && el.closest("[data-elementor-id]");
+		if (!w || !doc) return null;
+		return { post: Number(doc.getAttribute("data-elementor-id")) || 0, id: w.getAttribute("data-id"), widget: w.getAttribute("data-widget_type") || w.getAttribute("data-element_type") || "" };
+	}
+	/** True when the element holds more than plain text (links, icons, spans ...) - plain-text overlays are refused then. */
+	function hasMarkup(el) { return Array.prototype.some.call(el.children, function (c) { return c.tagName !== "BR"; }); }
+	/** tag + classes, without per-instance classes - "all similar elements". */
+	function similarOf(el) {
+		var cls = Array.prototype.filter.call(el.classList, function (c) { return c.indexOf("lcw-") !== 0 && !/^elementor-element-[a-z0-9]+$/.test(c) && /^[A-Za-z_-][\w-]*$/.test(c); }).slice(0, 3);
+		var sel = el.tagName.toLowerCase() + (cls.length ? "." + cls.join(".") : "");
+		var n = 0; try { n = document.querySelectorAll(sel).length; } catch (e) { n = 0; }
+		return { selector: sel, count: n };
 	}
 	/** The nearest landmark/section, so the assistant knows where on the page the element is. */
 	function sectionOf(el) {
@@ -220,15 +239,87 @@
 			try { var el = document.querySelector(d.selector); if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); outline(el); setTimeout(function () { if (!picking) box.hidden = true; }, 1800); } } catch (x) { /* bad selector */ }
 		}
 		else if (d.type === "lc:reload") {
-			// show the change: reload the page, keep the panel open on the same tab
+			// show the change like Ctrl+Shift+R: refresh this site's cached CSS/JS first, then reload; keep the panel open
 			state.open = true; state.tab = d.tab || state.tab; save();
-			var u = new URL(location.href); u.searchParams.set("lcv", String(Date.now()));
-			location.replace(u.href);
+			hardReload();
 		}
+		else if (d.type === "lc:preview") { preview(d.selector, d.styles || {}); }
+		else if (d.type === "lc:preview-clear") { clearPreview(); }
+		else if (d.type === "lc:edit-text" && d.selector) { editText(d.selector); }
 		else if (d.type === "lc:navigate" && d.url) {
 			try { var t = new URL(d.url, location.href); if (t.origin === location.origin) { state.open = true; save(); location.href = t.href; } } catch (x) { /* ignore */ }
 		}
 	});
+
+	// ------------------------------------------------------------------ live preview of manual style edits (nothing saved)
+	var previewed = [];
+	function clearPreview() {
+		previewed.forEach(function (p) { p.el.setAttribute("style", p.style); if (!p.style) p.el.removeAttribute("style"); });
+		previewed = [];
+	}
+	function preview(selector, styles) {
+		clearPreview();
+		var els = [];
+		try { els = Array.prototype.slice.call(document.querySelectorAll(selector), 0, 200); } catch (e) { return; }
+		els.forEach(function (el) {
+			if (el.closest("[data-livecrafts]")) return;
+			previewed.push({ el: el, style: el.getAttribute("style") || "" });
+			Object.keys(styles).forEach(function (k) { if (styles[k]) el.style.setProperty(k, styles[k], "important"); });
+		});
+	}
+
+	// ------------------------------------------------------------------ inline text editing on the page (manual mode)
+	var editing = null;
+	function editText(selector) {
+		stopEditing(false);
+		var el; try { el = document.querySelector(selector); } catch (e) { el = null; }
+		if (!el) { send({ type: "lc:text-error", error: "That element is no longer on the page." }); return; }
+		var oldText = (el.innerText || el.textContent || "").trim();
+		var bar = document.createElement("div");
+		bar.className = "lcw-editbar"; bar.setAttribute("data-livecrafts", "editbar");
+		bar.innerHTML = '<span>Editing text</span><button type="button" class="lcw-eb-cancel">Cancel</button><button type="button" class="lcw-eb-save">Save</button>';
+		document.body.appendChild(bar);
+		var r = el.getBoundingClientRect();
+		bar.style.top = Math.max(8, r.top - 46) + "px"; bar.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 260)) + "px";
+		editing = { el: el, oldText: oldText, oldHtml: el.innerHTML, bar: bar, selector: selector };
+		try { el.contentEditable = "plaintext-only"; } catch (e) { el.contentEditable = "true"; }
+		if (el.contentEditable !== "plaintext-only") el.contentEditable = "true";
+		el.classList.add("lcw-editing");
+		el.focus();
+		var range = document.createRange(); range.selectNodeContents(el); var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+		el.addEventListener("keydown", onEditKey);
+		bar.querySelector(".lcw-eb-save").addEventListener("click", function () { stopEditing(true); });
+		bar.querySelector(".lcw-eb-cancel").addEventListener("click", function () { stopEditing(false); });
+	}
+	function onEditKey(e) {
+		if (e.key === "Escape") { e.preventDefault(); stopEditing(false); }
+		else if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); stopEditing(true); }
+	}
+	function stopEditing(save) {
+		if (!editing) return;
+		var ed = editing; editing = null;
+		ed.el.removeEventListener("keydown", onEditKey);
+		ed.el.contentEditable = "false"; ed.el.removeAttribute("contenteditable");
+		ed.el.classList.remove("lcw-editing");
+		ed.bar.remove();
+		var newText = (ed.el.innerText || ed.el.textContent || "").trim();
+		if (!save || newText === ed.oldText) { ed.el.innerHTML = ed.oldHtml; send({ type: "lc:text-cancelled" }); return; }
+		send({ type: "lc:text-edited", selector: ed.selector, oldText: ed.oldText, newText: newText });
+	}
+
+	/** Like Ctrl+Shift+R: re-download this site's stylesheets/scripts into the browser cache, then reload. */
+	function hardReload() {
+		var urls = [];
+		Array.prototype.forEach.call(document.querySelectorAll('link[rel="stylesheet"][href], script[src]'), function (n) {
+			var u = n.href || n.src;
+			try { if (new URL(u).origin === location.origin) urls.push(u); } catch (e) { /* ignore */ }
+		});
+		var go = function () { var u = new URL(location.href); u.searchParams.set("lcv", String(Date.now())); location.replace(u.href); };
+		if (!urls.length || !window.fetch) return go();
+		Promise.all(urls.slice(0, 40).map(function (u) { return fetch(u, { cache: "reload", credentials: "same-origin" }).catch(function () { /* still reload */ }); }))
+			.then(go, go);
+		setTimeout(go, 4000); // never wait longer than this
+	}
 
 	if (state.open) open();
 	// remove our cache-busting parameter from the address bar after a reload

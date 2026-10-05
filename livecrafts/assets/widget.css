@@ -45,3 +45,12 @@
   .lcw-open .lcw-launcher { display: none; } /* full screen on phones: the chat's own close button is used */
 }
 @media (prefers-reduced-motion: reduce) { .lcw-panel, .lcw-launcher, .lcw-launcher * { animation: none; transition: none; } }
+
+/* inline text editing */
+.lcw-editing { outline: 2px dashed var(--lcw-accent, #5b5bd6) !important; outline-offset: 4px !important; cursor: text !important; }
+.lcw-editbar { position: fixed; z-index: 2147483001; display: flex; align-items: center; gap: 6px; padding: 6px 6px 6px 12px; border-radius: 12px; background: #101828; color: #fff;
+  font: 600 12.5px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; box-shadow: 0 10px 30px rgba(0, 0, 0, .3); }
+.lcw-editbar span { margin-right: 6px; opacity: .8; }
+.lcw-editbar button { all: unset; cursor: pointer; padding: 7px 12px; border-radius: 8px; font-weight: 600; }
+.lcw-eb-cancel { color: #d0d5dd; } .lcw-eb-cancel:hover { background: rgba(255, 255, 255, .1); }
+.lcw-eb-save { background: var(--lcw-accent, #5b5bd6); color: #fff; }

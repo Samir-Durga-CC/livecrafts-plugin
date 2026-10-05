@@ -21,6 +21,31 @@ add_action( 'rest_api_init', function () {
 } );
 
 // Read-only debug endpoints (what the server sees) - used by the panel's Debug box and the browser console helpers.
+// Read the saved style/text patches of one page (by URL or page key) + the site-wide ones.
+add_action( 'rest_api_init', function () {
+	register_rest_route( 'livecrafts/v1', '/patches', array(
+		'methods' => 'GET', 'callback' => 'livecrafts_rest_patches', 'permission_callback' => 'livecrafts_rest_permission',
+	) );
+} );
+
+function livecrafts_rest_patches( WP_REST_Request $req ) {
+	$key = (string) $req->get_param( 'pageKey' );
+	$url = (string) $req->get_param( 'url' );
+	if ( $key === '' && $url !== '' ) {
+		$post = function_exists( 'livecrafts_url_to_post' ) ? livecrafts_url_to_post( $url ) : 0;
+		$path = wp_parse_url( $url, PHP_URL_PATH );
+		$key  = $post ? 'p' . $post : 'u:' . md5( $path ? $path : '/' );
+	}
+	if ( ! livecrafts_valid_key( $key ) ) return new WP_Error( 'livecrafts_bad_request', 'Pass a page URL or a valid pageKey.', array( 'status' => 400 ) );
+	$all = livecrafts_get_all();
+	return array(
+		'ok'      => true,
+		'pageKey' => $key,
+		'page'    => isset( $all[ $key ] ) ? (object) $all[ $key ] : new stdClass(),
+		'site'    => isset( $all['site'] ) ? (object) $all['site'] : new stdClass(),
+	);
+}
+
 add_action( 'rest_api_init', function () {
 	foreach ( array( 'fields', 'target', 'elementor' ) as $route ) {
 		register_rest_route( 'livecrafts/v1', '/debug/' . $route, array(
@@ -43,9 +68,12 @@ function livecrafts_rest_save( WP_REST_Request $req ) {
 	$sel = livecrafts_clean_selector( $req->get_param( 'selector' ) );
 	if ( ! $key || $sel === '' ) return new WP_Error( 'livecrafts_bad_request', 'Invalid page or selector.', array( 'status' => 400 ) );
 
-	$patch  = array();
-	$styles = livecrafts_clean_styles( $req->get_param( 'styles' ) );
-	if ( $styles ) $patch['styles'] = $styles;
+	$patch = array();
+	// "styles" apply on every screen; "styles_tablet" / "styles_mobile" only up to 1024px / 767px wide.
+	foreach ( array( 'styles', 'styles_tablet', 'styles_mobile' ) as $k ) {
+		$s = livecrafts_clean_styles( $req->get_param( $k ) );
+		if ( $s ) $patch[ $k ] = $s;
+	}
 
 	$text = $req->get_param( 'text' );
 	if ( is_string( $text ) ) {

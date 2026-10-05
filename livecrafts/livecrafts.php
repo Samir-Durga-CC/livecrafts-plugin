@@ -2,14 +2,14 @@
 /**
  * Plugin Name: Livecrafts
  * Description: Click any element on any page and edit its text and style visually. Works on any theme or page builder because edits are saved as non-destructive "patches" (CSS + text) instead of changing theme files.
- * Version: 0.8.0
+ * Version: 0.9.0
  * Author: Livecrafts
  * Text Domain: livecrafts
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'LIVECRAFTS_VERSION', '0.8.0' );
+define( 'LIVECRAFTS_VERSION', '0.9.0' );
 define( 'LIVECRAFTS_DIR', plugin_dir_path( __FILE__ ) );
 define( 'LIVECRAFTS_URL', plugin_dir_url( __FILE__ ) );
 
