@@ -9,7 +9,7 @@
 (function () {
 	"use strict";
 	var C = window.LIVECRAFTS_WIDGET;
-	if (!C || !C.backend || window.__livecraftsWidget) return;
+	if (!C || !C.backend || window.__livecraftsWidget || window.name === "lcw-probe") return;
 	window.__livecraftsWidget = true;
 
 	var backendOrigin;
@@ -246,6 +246,7 @@
 			state.open = true; state.tab = d.tab || state.tab; save();
 			hardReload();
 		}
+		else if (d.type === "lc:eyes" && d.id) { handleEyes(d); }
 		else if (d.type === "lc:preview") { preview(d.selector, d.styles || {}); }
 		else if (d.type === "lc:preview-clear") { clearPreview(); }
 		else if (d.type === "lc:edit-text" && d.selector) { editText(d.selector); }
@@ -324,6 +325,170 @@
 		Promise.all(urls.slice(0, 40).map(function (u) { return fetch(u, { cache: "reload", credentials: "same-origin" }).catch(function () { /* still reload */ }); }))
 			.then(go, go);
 		setTimeout(go, 4000); // never wait longer than this
+	}
+
+	// ------------------------------------------------------------------ "eyes": the assistant looks through THIS browser
+	// (exactly what the person sees: logged in, real fonts, past any "checking your browser" page). Other pages and other
+	// screen sizes are opened in a hidden same-site frame of the right width.
+	var DEVW = { desktop: 1366, tablet: 820, mobile: 390 };
+	var EPROPS = ["color", "background-color", "background-image", "font-family", "font-size", "font-weight", "line-height", "letter-spacing", "text-transform", "text-align", "margin", "padding", "border-radius", "display", "width", "max-width"];
+	function deviceOf(w) { return w <= 767 ? "mobile" : w <= 1024 ? "tablet" : "desktop"; }
+	function samePath(url) {
+		if (!url) return true;
+		try { var u = new URL(url, location.href); return u.origin === location.origin && u.pathname.replace(/\/+$/, "") === location.pathname.replace(/\/+$/, ""); } catch (e) { return false; }
+	}
+	function withDoc(args, fn) {
+		var device = args.device || deviceOf(window.innerWidth);
+		if (samePath(args.url) && device === deviceOf(window.innerWidth)) {
+			try { return Promise.resolve(fn(document, window, device)); } catch (e) { return Promise.reject(e); }
+		}
+		var u;
+		try { u = new URL(args.url || location.href, location.href); } catch (e) { return Promise.reject(new Error("That is not a valid page address.")); }
+		if (u.origin !== location.origin) return Promise.reject(new Error("Only pages of this site can be opened."));
+		u.searchParams.set("lcprobe", String(Date.now()));
+		return new Promise(function (resolve, reject) {
+			var f = document.createElement("iframe");
+			f.name = "lcw-probe"; f.setAttribute("data-livecrafts", "probe"); f.setAttribute("aria-hidden", "true");
+			f.style.cssText = "position:fixed;left:-30000px;top:0;width:" + (DEVW[device] || 1366) + "px;height:900px;border:0;opacity:0;pointer-events:none";
+			var done = false;
+			var fail = function (msg) { if (done) return; done = true; f.remove(); reject(new Error(msg)); };
+			var t = setTimeout(function () { fail("The page took too long to load in the browser."); }, 25000);
+			f.onload = function () {
+				setTimeout(function () {
+					if (done) return;
+					clearTimeout(t);
+					var doc; try { doc = f.contentDocument; } catch (e) { doc = null; }
+					if (!doc) return fail("The page could not be opened in the browser.");
+					Promise.resolve().then(function () { return fn(doc, f.contentWindow, device); })
+						.then(function (r) { done = true; f.remove(); resolve(r); }, function (e) { fail(e && e.message ? e.message : String(e)); });
+				}, 1200); // let fonts and late scripts settle
+			};
+			f.src = u.href;
+			document.body.appendChild(f);
+		});
+	}
+	function norm(s) { return String(s || "").replace(/\s+/g, " ").trim().toLowerCase(); }
+	function findEls(doc, args) {
+		if (args.selector) { try { return Array.prototype.slice.call(doc.querySelectorAll(args.selector)).filter(function (e) { return !e.closest("[data-livecrafts]"); }); } catch (e) { throw new Error("Invalid CSS selector."); } }
+		var t = norm(args.text);
+		if (!t) return [];
+		return Array.prototype.filter.call(doc.body.querySelectorAll("*"), function (e) {
+			if (/^(SCRIPT|STYLE|NOSCRIPT)$/.test(e.tagName) || e.closest("[data-livecrafts]")) return false;
+			return Array.prototype.some.call(e.childNodes, function (n) { return n.nodeType === 3 && norm(n.textContent).indexOf(t) !== -1; });
+		});
+	}
+	function fileOf(href) {
+		var base = String(C.siteUrl || location.origin).replace(/\/+$/, "") + "/";
+		return href && href.indexOf(base) === 0 ? href.slice(base.length).split("?")[0] : undefined;
+	}
+	function eyesInspect(doc, win, args) {
+		if (!args.text && !args.selector) throw new Error("Give the visible text of the element or a CSS selector.");
+		var els = findEls(doc, args);
+		var out = els.slice(0, 3).map(function (el) {
+			var cs = win.getComputedStyle(el), computed = {}, rules = [];
+			EPROPS.forEach(function (p) { computed[p] = cs.getPropertyValue(p); });
+			var visit = function (list, sheet, media) {
+				Array.prototype.forEach.call(list, function (r) {
+					if (r.type === 4) { if (win.matchMedia(r.conditionText || r.media.mediaText).matches) visit(r.cssRules, sheet, r.conditionText || r.media.mediaText); return; }
+					if (r.type !== 1) return;
+					var hit = false; try { hit = el.matches(r.selectorText); } catch (e) { /* unsupported selector */ }
+					if (!hit) return;
+					var decl = {};
+					EPROPS.forEach(function (p) { var v = r.style.getPropertyValue(p); if (v) decl[p] = v + (r.style.getPropertyPriority(p) ? " !important" : ""); });
+					if (Object.keys(decl).length) rules.push({ selector: r.selectorText, stylesheet: sheet.href || (sheet.ownerNode && sheet.ownerNode.id ? "<style id=" + sheet.ownerNode.id + ">" : "inline <style> in the page"), file: fileOf(sheet.href), media: media || undefined, declarations: decl });
+				});
+			};
+			Array.prototype.forEach.call(doc.styleSheets, function (sheet) {
+				try { visit(sheet.cssRules, sheet); } catch (e) { rules.push({ stylesheet: sheet.href, note: "cross-origin stylesheet: its rules cannot be read" }); }
+			});
+			var r = el.getBoundingClientRect();
+			return {
+				tag: el.tagName.toLowerCase(), id: el.id || undefined, classes: Array.prototype.filter.call(el.classList, function (c) { return c.indexOf("lcw-") !== 0; }).join(" ") || undefined,
+				text: norm(el.textContent).slice(0, 120), inlineStyle: el.getAttribute("style") || undefined, computed: computed, rules: rules,
+				box: { width: Math.round(r.width), height: Math.round(r.height) }, visible: r.width > 0 && r.height > 0 && cs.visibility !== "hidden" && cs.display !== "none",
+			};
+		});
+		return { ok: true, url: doc.location.href.replace(/[?&]lcprobe=\d+/, ""), count: els.length, elements: out,
+			howToRead: "computed = what the visitor sees. rules = every CSS rule that sets those properties, in cascade order (later ones win unless !important). Edit the rule in `file`, or use style_patch." };
+	}
+	function eyesRead(doc) {
+		return {
+			ok: true, url: doc.location.href.replace(/[?&]lcprobe=\d+/, ""), title: doc.title,
+			headings: Array.prototype.slice.call(doc.querySelectorAll("h1,h2,h3"), 0, 40).map(function (h) { return { tag: h.tagName.toLowerCase(), text: norm(h.textContent).slice(0, 160) }; }),
+			text: String(doc.body.innerText || "").replace(/\n{3,}/g, "\n\n").slice(0, 15000),
+			images: Array.prototype.slice.call(doc.images, 0, 30).filter(function (i) { return !i.closest("[data-livecrafts]"); }).map(function (i) { return { src: i.currentSrc || i.src, alt: i.alt, width: i.naturalWidth, height: i.naturalHeight }; }),
+			links: Array.prototype.slice.call(doc.querySelectorAll("a[href]"), 0, 50).filter(function (l) { return !l.closest("[data-livecrafts]"); }).map(function (l) { return { text: norm(l.textContent).slice(0, 60), href: l.href }; }),
+		};
+	}
+	function eyesDesign(doc, win) {
+		var cs = function (el) { return win.getComputedStyle(el); };
+		var pick = function (sel) { var el = doc.querySelector(sel); if (!el || el.closest("[data-livecrafts]")) return null; var s = cs(el); return { family: s.fontFamily.split(",")[0].replace(/["']/g, "").trim(), size: s.fontSize, weight: s.fontWeight, lineHeight: s.lineHeight, color: s.color, letterSpacing: s.letterSpacing, textTransform: s.textTransform }; };
+		var typography = {}; ["h1", "h2", "h3", "h4", "p", "a", "li", "button"].forEach(function (t) { typography[t] = pick(t); });
+		var count = function (m, k) { if (k && !/rgba\(0, 0, 0, 0\)|transparent/.test(k)) m[k] = (m[k] || 0) + 1; };
+		var text = {}, bg = {}, radius = {}, gaps = {};
+		var all = Array.prototype.slice.call(doc.body.querySelectorAll("*"), 0, 3000).filter(function (e) { return !e.closest("[data-livecrafts]"); });
+		all.forEach(function (el) {
+			var s = cs(el);
+			if (Array.prototype.some.call(el.childNodes, function (n) { return n.nodeType === 3 && n.textContent.trim(); })) count(text, s.color);
+			count(bg, s.backgroundColor);
+			if (s.borderRadius !== "0px") count(radius, s.borderRadius);
+			if (/^(SECTION|HEADER|FOOTER)$/.test(el.tagName) || /section|container|wrap/i.test(String(el.className))) { count(gaps, s.paddingTop); count(gaps, s.paddingBottom); }
+		});
+		var top = function (m, n) { return Object.keys(m).sort(function (a, b) { return m[b] - m[a]; }).slice(0, n).map(function (k) { return { value: k, uses: m[k] }; }); };
+		var btn = doc.querySelector("a.btn, .btn, .button, .wp-block-button__link, .elementor-button");
+		var button = btn ? (function () { var s = cs(btn); return { selector: btn.className ? "." + String(btn.className).trim().split(/\s+/).join(".") : btn.tagName.toLowerCase(), background: s.backgroundColor, color: s.color, padding: s.padding, radius: s.borderRadius, font: s.fontWeight + " " + s.fontSize + " " + s.fontFamily.split(",")[0], textTransform: s.textTransform }; })() : null;
+		var container = null;
+		for (var i = 0; i < all.length; i++) { var mw = cs(all[i]).maxWidth; if (/px$/.test(mw)) { var v = parseFloat(mw); if (v >= 900 && v <= 1600) { container = v + "px"; break; } } }
+		var vars = {}, media = {};
+		Array.prototype.forEach.call(doc.styleSheets, function (sheet) {
+			var rules; try { rules = sheet.cssRules; } catch (e) { return; }
+			Array.prototype.forEach.call(rules, function (r) {
+				if (r.type === 4) { var m = String(r.conditionText || r.media.mediaText).match(/(max|min)-width:\s*([\d.]+)px/); if (m) media[m[1] + "-width " + m[2] + "px"] = 1; }
+				if (r.type === 1 && /^(:root|html|body)$/.test(r.selectorText.trim())) for (var k = 0; k < r.style.length; k++) { var p = r.style[k]; if (p.indexOf("--") === 0 && Object.keys(vars).length < 60) vars[p] = r.style.getPropertyValue(p).trim(); }
+			});
+		});
+		var builder = doc.querySelector("[data-elementor-id]") ? "elementor" : doc.querySelector(".wp-block-group, .wp-site-blocks") ? "blocks" : "classic theme";
+		return { ok: true, url: doc.location.href.replace(/[?&]lcprobe=\d+/, ""), builder: builder, typography: typography, textColors: top(text, 6), backgrounds: top(bg, 6), radii: top(radius, 4), sectionSpacing: top(gaps, 4), button: button, containerMaxWidth: container, cssVariables: vars, breakpoints: Object.keys(media).slice(0, 12),
+			howToUse: "Reuse these fonts, sizes, colours (prefer the CSS variables), radii, spacing and breakpoints so new work looks native to this site." };
+	}
+	var shotLib = null;
+	function loadShotLib() {
+		if (window.modernScreenshot) return Promise.resolve(window.modernScreenshot);
+		if (shotLib) return shotLib;
+		shotLib = new Promise(function (resolve, reject) {
+			var s = document.createElement("script");
+			s.src = String(C.assets || "").replace(/\/?$/, "/") + "vendor/modern-screenshot.js?ver=" + encodeURIComponent(C.version || "");
+			s.onload = function () { window.modernScreenshot ? resolve(window.modernScreenshot) : reject(new Error("Screenshot library did not load.")); };
+			s.onerror = function () { shotLib = null; reject(new Error("Screenshot library could not be loaded.")); };
+			document.head.appendChild(s);
+		});
+		return shotLib;
+	}
+	function eyesScreenshot(doc, win, args, device) {
+		return loadShotLib().then(function (lib) {
+			var node = doc.body, target = "page";
+			if (args.selector || args.text) { var els = findEls(doc, args); if (els.length) { node = els[0]; target = args.selector || ('text "' + args.text + '"'); } }
+			var whole = node === doc.body;
+			var w = whole ? win.innerWidth : Math.ceil(node.getBoundingClientRect().width);
+			var opts = { scale: Math.min(1, 1400 / Math.max(1, w)), quality: 0.82, backgroundColor: "#ffffff",
+				filter: function (n) { return !(n && n.getAttribute && n.getAttribute("data-livecrafts")); } };
+			// the page: what fits the screen (or the full page); an element: let the library measure it exactly
+			if (whole) { opts.width = w; opts.height = Math.max(1, Math.min(doc.documentElement.scrollHeight, args.fullPage ? 6000 : win.innerHeight)); }
+			else opts.style = { margin: "0" }; // the copy must not pick up default margins (they push the content out of the picture)
+			return lib.domToJpeg(node, opts).then(function (dataUrl) {
+				return { ok: true, image: dataUrl, device: device, target: target, url: doc.location.href.replace(/[?&]lcprobe=\d+/, ""), note: "Captured in the person's own browser." };
+			});
+		});
+	}
+	function handleEyes(d) {
+		var a = d.args || {};
+		var job = d.action === "inspect" ? withDoc(a, function (doc, win) { return eyesInspect(doc, win, a); })
+			: d.action === "read" ? withDoc(a, function (doc) { return eyesRead(doc); })
+			: d.action === "design" ? withDoc(a, function (doc, win) { return eyesDesign(doc, win); })
+			: d.action === "screenshot" ? withDoc(a, function (doc, win, device) { return eyesScreenshot(doc, win, a, device); })
+			: Promise.reject(new Error("Unknown request."));
+		job.then(function (result) { send({ type: "lc:eyes-result", id: d.id, ok: true, result: result }); },
+			function (e) { send({ type: "lc:eyes-result", id: d.id, ok: false, error: e && e.message ? e.message : String(e) }); });
 	}
 
 	if (state.open) open();

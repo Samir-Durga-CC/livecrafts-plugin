@@ -142,5 +142,6 @@ add_action( 'wp_enqueue_scripts', function () {
 		'user'         => wp_get_current_user()->display_name,
 		'pageKey'      => livecrafts_page_key(),
 		'version'      => LIVECRAFTS_VERSION,
+		'assets'       => LIVECRAFTS_URL . 'assets/',
 	) );
 }, 40 );
