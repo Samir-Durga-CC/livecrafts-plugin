@@ -72,17 +72,25 @@
 			frame = document.createElement("iframe");
 			frame.className = "lcw-frame";
 			frame.title = C.botName || "Assistant";
-			frame.allow = "clipboard-write";
+			// "local-network-access": Chrome/Edge only let a public site load an app on this computer after the person allows it.
+			frame.allow = "clipboard-write; local-network-access; local-network";
 			frame.src = frameUrl();
+			var isLocal = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(backendOrigin);
 			var err = document.createElement("div");
 			err.className = "lcw-offline";
-			err.innerHTML = "<b>Cannot reach the Livecrafts app.</b><br>Is it running at <code>" + escapeHtml(C.backend) + "</code>?<br>Start it with <code>npm start</code>, then reopen this panel.";
+			err.innerHTML = "<b>Cannot reach the Livecrafts app.</b>" +
+				(isLocal ? "<p>1. Is it running? Start it with <code>npm start</code> (it should say <code>" + escapeHtml(C.backend) + "</code>).</p>" +
+					"<p>2. Did the browser ask to <b>“access other apps and services on this device”</b>? Click <b>Allow</b>. If you closed it: click the icon left of the address bar → Site settings → <b>Local network access</b> → Allow.</p>"
+					: "<p>Check that the Livecrafts app is online at <code>" + escapeHtml(C.backend) + "</code>.</p>") +
+				'<button type="button" class="lcw-retry">Try again</button>';
 			err.hidden = true;
 			panel.appendChild(err);
 			panel.appendChild(frame);
 			// The chat says "lc:ready" when it loaded; if it never does, the app is not running (or blocked).
 			var ready = false;
-			setTimeout(function () { if (!ready) err.hidden = false; }, 8000);
+			var watch = function () { setTimeout(function () { if (!ready) err.hidden = false; }, 8000); };
+			watch();
+			err.querySelector(".lcw-retry").addEventListener("click", function () { err.hidden = true; frame.src = frameUrl(); watch(); });
 			window.addEventListener("message", function (e) { if (e.origin === backendOrigin && e.data && e.data.type === "lc:ready") { ready = true; err.hidden = true; } });
 		}
 		panel.hidden = false;
