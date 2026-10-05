@@ -141,5 +141,6 @@ add_action( 'wp_enqueue_scripts', function () {
 		'pageUrl'      => ( isset( $_SERVER['HTTP_HOST'], $_SERVER['REQUEST_URI'] ) ? esc_url_raw( $scheme . '://' . wp_unslash( $_SERVER['HTTP_HOST'] ) . wp_unslash( $_SERVER['REQUEST_URI'] ) ) : home_url( '/' ) ),
 		'user'         => wp_get_current_user()->display_name,
 		'pageKey'      => livecrafts_page_key(),
+		'version'      => LIVECRAFTS_VERSION,
 	) );
 }, 40 );

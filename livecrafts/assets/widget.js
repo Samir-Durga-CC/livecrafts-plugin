@@ -63,8 +63,9 @@
 		var cfg = {
 			siteUrl: C.siteUrl, pageUrl: location.href.split("#")[0], botName: C.botName, welcome: C.welcome, accent: C.accent,
 			approvalMode: C.approvalMode, token: C.token || "", user: C.user || "", parentOrigin: location.origin, tab: state.tab || "chat",
+			widgetVersion: C.version || "0.9.0", pageKey: C.pageKey || "",
 		};
-		return C.backend.replace(/\/+$/, "") + "/?embed=1#cfg=" + encodeURIComponent(JSON.stringify(cfg));
+		return C.backend.replace(/\/+$/, "") + "/?embed=1&v=" + encodeURIComponent(C.version || "") + "#cfg=" + encodeURIComponent(JSON.stringify(cfg));
 	}
 
 	function open() {
@@ -173,12 +174,14 @@
 		var r = el.getBoundingClientRect();
 		var img = el.tagName === "IMG" ? el : el.querySelector && el.querySelector("img");
 		var similar = similarOf(el);
+		var bg = (cs.getPropertyValue("background-image").match(/url\(["']?([^"')]+)["']?\)/) || [])[1] || "";
 		return {
 			selector: uniqueSelector(el), label: describe(el), tag: el.tagName.toLowerCase(),
 			id: el.id || "", classes: Array.prototype.slice.call(el.classList).filter(function (c) { return c.indexOf("lcw-") !== 0; }).join(" "),
 			text: (el.innerText || el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 400),
 			html: el.outerHTML.replace(/\s+/g, " ").slice(0, 1200),
-			image: img ? { src: img.currentSrc || img.src, alt: img.alt || "" } : null,
+			image: img ? { src: img.currentSrc || img.src, alt: img.alt || "", selector: uniqueSelector(img) } : null, bgImage: bg,
+			rawText: (el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 2000),
 			link: el.closest && el.closest("a") ? el.closest("a").href : "",
 			styles: styles, rect: { width: Math.round(r.width), height: Math.round(r.height) },
 			section: sectionOf(el), pageUrl: location.href.split("#")[0].replace(/[?&]lcv=\d+/, ""), viewport: window.innerWidth,
@@ -274,7 +277,8 @@
 		stopEditing(false);
 		var el; try { el = document.querySelector(selector); } catch (e) { el = null; }
 		if (!el) { send({ type: "lc:text-error", error: "That element is no longer on the page." }); return; }
-		var oldText = (el.innerText || el.textContent || "").trim();
+		// textContent = the real text (innerText would return CSS-uppercased text and save it in capitals)
+		var oldText = (el.textContent || "").replace(/\s+/g, " ").trim();
 		var bar = document.createElement("div");
 		bar.className = "lcw-editbar"; bar.setAttribute("data-livecrafts", "editbar");
 		bar.innerHTML = '<span>Editing text</span><button type="button" class="lcw-eb-cancel">Cancel</button><button type="button" class="lcw-eb-save">Save</button>';
@@ -288,6 +292,7 @@
 		el.focus();
 		var range = document.createRange(); range.selectNodeContents(el); var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
 		el.addEventListener("keydown", onEditKey);
+		send({ type: "lc:edit-started" });
 		bar.querySelector(".lcw-eb-save").addEventListener("click", function () { stopEditing(true); });
 		bar.querySelector(".lcw-eb-cancel").addEventListener("click", function () { stopEditing(false); });
 	}
@@ -302,7 +307,7 @@
 		ed.el.contentEditable = "false"; ed.el.removeAttribute("contenteditable");
 		ed.el.classList.remove("lcw-editing");
 		ed.bar.remove();
-		var newText = (ed.el.innerText || ed.el.textContent || "").trim();
+		var newText = (ed.el.textContent || "").replace(/\s+/g, " ").trim();
 		if (!save || newText === ed.oldText) { ed.el.innerHTML = ed.oldHtml; send({ type: "lc:text-cancelled" }); return; }
 		send({ type: "lc:text-edited", selector: ed.selector, oldText: ed.oldText, newText: newText });
 	}
