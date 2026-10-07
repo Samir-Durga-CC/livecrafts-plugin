@@ -99,3 +99,4 @@
   .lcw-draftbar { position: fixed; left: 14px; right: 82px; bottom: 22px; overflow-x: auto; }
   .lcw-db-text { display: none; }
 }
+@media (max-width: 520px) { .lcw-open .lcw-draftbar { display: none; } } /* the chat is full screen on phones: the bar must not cover it */

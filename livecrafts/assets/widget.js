@@ -521,14 +521,26 @@
 	bar.setAttribute("aria-label", "Draft changes");
 	root.appendChild(bar);
 
+	/** A Livecrafts REST address. Works with pretty permalinks (/wp-json/...) and with ?rest_route=/... sites. */
+	function endpoint(path) {
+		var q = path.indexOf("?"), route = q < 0 ? path : path.slice(0, q), query = q < 0 ? "" : path.slice(q + 1);
+		var u = new URL(String(C.restUrl || ""), location.href);
+		if (u.searchParams.has("rest_route")) {
+			u.searchParams.set("rest_route", u.searchParams.get("rest_route").replace(/\/?$/, "/") + route);
+		} else {
+			u.pathname = u.pathname.replace(/\/?$/, "/") + route;
+		}
+		if (query) new URLSearchParams(query).forEach(function (v, k) { u.searchParams.set(k, v); });
+		return u.href;
+	}
 	function wp(method, path, body) {
-		return fetch(String(C.restUrl || "").replace(/\/?$/, "/") + path, {
+		return fetch(endpoint(path), {
 			method: method, credentials: "same-origin",
 			headers: { "Content-Type": "application/json", "X-WP-Nonce": C.nonce },
 			body: body ? JSON.stringify(body) : undefined,
 		}).then(function (r) {
 			return r.json().catch(function () { return {}; }).then(function (j) {
-				if (!r.ok) { var e = new Error(j && j.message ? j.message : "The site answered " + r.status + "."); e.code = j && j.code; e.data = j && j.data; throw e; }
+				if (!r.ok) { var e = new Error(j && j.message ? j.message : "The site answered " + r.status + " for " + r.url.replace(/[?&]_wpnonce=[^&]*/, "") + " (not a WordPress REST answer: check permalinks or a security plugin blocking /wp-json)."); e.code = j && j.code; e.data = j && j.data; throw e; }
 				return j;
 			});
 		});
