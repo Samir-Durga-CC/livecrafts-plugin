@@ -309,9 +309,14 @@ function livecrafts_change_revert( $id, array $opts = array() ) {
 	}
 
 	// live: put the old value back as a new draft change
-	$o = $opts + array( 'actor' => $actor, 'reverts' => $c['id'] );
-	if ( livecrafts_kind( $c['kind'] ) && $c['kind'] !== 'object.restore' ) {
-		$r = livecrafts_change_create( $c['kind'], $c['object_type'], $c['object_id'], $c['target'], $c['payload']['before'], $o + array( 'args' => array( 'label' => isset( $c['payload']['label'] ) ? $c['payload']['label'] : '' ) ) );
+	$o    = $opts + array( 'actor' => $actor, 'reverts' => $c['id'] );
+	$kind = livecrafts_kind( $c['kind'] );
+	if ( $kind && $c['kind'] !== 'object.restore' ) {
+		// By default the inverse is the same kind with the old value; structure changes (insert/remove/move) say otherwise.
+		$inverse = isset( $kind['revert'] ) ? call_user_func( $kind['revert'], $c ) : array( $c['kind'], $c['target'], $c['payload']['before'], $c['payload'] );
+		if ( is_wp_error( $inverse ) ) return $inverse;
+		list( $k, $target, $value, $args ) = $inverse;
+		$r = livecrafts_change_create( $k, $c['object_type'], $c['object_id'], $target, $value, $o + array( 'args' => (array) $args ) );
 	} elseif ( $c['kind'] === 'post.create' ) {
 		$r = livecrafts_change_create( 'post.field', 'post', $c['object_id'], 'status', 'draft', $o );
 	} else {

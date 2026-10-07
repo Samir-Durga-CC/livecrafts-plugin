@@ -67,6 +67,26 @@ function livecrafts_kinds() {
 				return true;
 			},
 		),
+		// One style rule (selector + screen size) in its own Additional CSS block. Values merge; '' removes a property.
+		'css.rule' => array(
+			'object'  => 'css',
+			'prepare' => 'livecrafts_kind_css_rule_prepare',
+			'read'    => function ( $data, $target ) { return livecrafts_css_rule_parse( livecrafts_css_block_get( $data['css'], $target ) ); },
+			'apply'   => function ( &$data, $target, $after, $payload ) {
+				$after = (array) $after;
+				$text  = $after ? livecrafts_css_rule_text( $payload['selector'], $payload['media'], $after ) : '';
+				$data['css'] = livecrafts_css_block_set( $data['css'], $target, $text, $payload['label'] );
+				$animated = ! empty( $after['animation-name'] ) && $after['animation-name'] !== 'none';
+				if ( $animated && livecrafts_css_block_get( $data['css'], 'lc-animations' ) === '' ) {
+					$data['css'] = livecrafts_css_block_set( $data['css'], 'lc-animations', livecrafts_css_animations(), 'Livecrafts entrance animations' );
+				}
+				return true;
+			},
+			'revert'  => function ( $c ) {
+				$p = $c['payload'];
+				return array( 'css.rule', $c['target'], array( 'selector' => $p['selector'], 'media' => $p['media'], 'declarations' => (array) $p['before'], 'replace' => true ), array( 'label' => $p['label'] ) );
+			},
+		),
 		// Put a whole object back to a recorded state (revert of a change made outside Livecrafts, or of a reset).
 		'object.restore' => array(
 			'object'  => 'any',
@@ -189,5 +209,51 @@ function livecrafts_kind_restore_prepare( $object_id, $target, $value, array $dr
 		'before'  => livecrafts_data_hash( $live ),
 		'payload' => array( 'from_change' => isset( $args['from_change'] ) ? (int) $args['from_change'] : 0 ),
 		'summary' => isset( $args['summary'] ) ? (string) $args['summary'] : 'Restore an earlier state',
+	);
+}
+
+/**
+ * $value = array( 'selector' => '.site-header .menu a', 'media' => ''|'desktop'|'tablet'|'mobile',
+ *                 'declarations' => array( prop => value, ... ), 'replace' => false )
+ * Declarations merge into the existing rule for that selector + screen size ('' removes one); replace = exactly these.
+ */
+function livecrafts_kind_css_rule_prepare( $object_id, $target, $value, array $draft, array $args, $actor ) {
+	if ( ! user_can( $actor, 'edit_css' ) ) return new WP_Error( 'livecrafts_forbidden', 'Your account cannot change the site CSS.', array( 'status' => 403 ) );
+	if ( ! is_array( $value ) || ! isset( $value['declarations'] ) || ! is_array( $value['declarations'] ) ) {
+		return livecrafts_bad_value( 'A style rule needs {selector, media, declarations: {property: value}}.' );
+	}
+	$selector = livecrafts_css_selector_clean( isset( $value['selector'] ) ? $value['selector'] : '' );
+	if ( $selector === '' ) return livecrafts_bad_value( 'That selector cannot be used (no braces, semicolons, @ or comments).' );
+	$media = isset( $value['media'] ) ? (string) $value['media'] : '';
+	if ( ! array_key_exists( $media, livecrafts_css_media() ) ) return livecrafts_bad_value( 'media must be empty (all screens), desktop, tablet or mobile.' );
+
+	$id      = livecrafts_css_rule_id( $selector, $media );
+	$current = livecrafts_css_rule_parse( livecrafts_css_block_get( $draft['css'], $id ) );
+	$decl    = empty( $value['replace'] ) ? $current : array();
+	$changed = array();
+	foreach ( $value['declarations'] as $prop => $v ) {
+		$prop = strtolower( trim( (string) $prop ) );
+		if ( ! in_array( $prop, livecrafts_css_props(), true ) ) return livecrafts_bad_value( 'The property "' . $prop . '" cannot be set by a style rule.' );
+		$v = trim( (string) $v );
+		if ( $v === '' ) { unset( $decl[ $prop ] ); $changed[] = $prop . ' (reset)'; continue; }
+		$clean = livecrafts_css_value_clean( $prop, $v );
+		if ( is_wp_error( $clean ) ) return $clean;
+		$decl[ $prop ] = $clean;
+		$changed[]     = $prop . ' ' . $clean;
+	}
+	// An animation without a duration does nothing: give it the usual entrance timing.
+	if ( ! empty( $decl['animation-name'] ) && $decl['animation-name'] !== 'none' && empty( $decl['animation-duration'] ) ) {
+		$decl['animation-duration']  = '0.6s';
+		$decl['animation-fill-mode'] = isset( $decl['animation-fill-mode'] ) ? $decl['animation-fill-mode'] : 'both';
+	}
+	ksort( $decl );
+	$blocks = livecrafts_css_blocks( $draft['css'] );
+	$label  = ! empty( $args['label'] ) ? (string) $args['label'] : ( isset( $blocks[ $id ] ) && $blocks[ $id ]['label'] !== '' ? $blocks[ $id ]['label'] : $selector );
+	$label  = mb_substr( $label, 0, 80 );
+	return array(
+		'target'  => $id,
+		'after'   => $decl,
+		'payload' => array( 'selector' => $selector, 'media' => $media, 'label' => $label ),
+		'summary' => 'Style ' . $label . ( $media !== '' ? ' (' . $media . ')' : '' ) . ': ' . ( $changed ? implode( ', ', array_slice( $changed, 0, 6 ) ) : 'reset' ),
 	);
 }
