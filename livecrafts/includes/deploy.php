@@ -199,11 +199,14 @@ function livecrafts_commit_post( $post_id, array $live, array $want, array $chan
 		unset( $meta['_elementor_data'] );
 	}
 
-	// ACF values: through update_field, which writes the value and its field reference.
-	if ( function_exists( 'update_field' ) ) {
+	// Top-level ACF values of simple fields go through update_field (ACF's own hooks run). Values inside groups and
+	// rows, and row counts / layouts, are written as the meta ACF itself stores - update_field cannot address them.
+	if ( function_exists( 'update_field' ) && function_exists( 'acf_get_field' ) ) {
 		foreach ( array_keys( $meta ) as $key ) {
 			$ref = isset( $want['meta'][ '_' . $key ] ) ? $want['meta'][ '_' . $key ] : '';
 			if ( $key[0] === '_' || ! is_string( $ref ) || strpos( $ref, 'field_' ) !== 0 || ! array_key_exists( $key, $want['meta'] ) ) continue;
+			$field = acf_get_field( $ref );
+			if ( ! $field || $field['name'] !== $key || ! in_array( $field['type'], livecrafts_supported_types(), true ) ) continue;
 			update_field( $ref, $want['meta'][ $key ], $post_id );
 			unset( $meta[ $key ], $meta[ '_' . $key ] );
 		}

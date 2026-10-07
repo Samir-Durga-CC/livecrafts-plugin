@@ -250,6 +250,14 @@ function livecrafts_rest_debug_target( WP_REST_Request $req ) {
 		$out    = array( 'kind' => 'elementor', 'found' => $d['found'], 'widget' => $d['type'], 'setting' => $t['path'], 'draft_value' => $d['value'], 'live_value' => $l['value'],
 			'where_stored' => 'wp_postmeta "_elementor_data" (one JSON tree for the whole page) of post ' . $t['post'] );
 		if ( is_array( $d['value'] ) && ! empty( $d['value']['id'] ) ) $out['attachment'] = livecrafts_attachment_info( $d['value']['id'] );
+	} elseif ( $t['type'] === 'acfv' ) {
+		$kind   = 'acf.value';
+		$target = $t['name'];
+		$field  = livecrafts_acf_field_of( $draft, $t['name'] );
+		if ( ! $field ) return new WP_Error( 'livecrafts_no_field', 'There is no ACF value "' . $t['name'] . '" on this page.', array( 'status' => 404 ) );
+		$out = array( 'kind' => 'acf', 'field' => array( 'key' => $field['key'], 'name' => $field['name'], 'label' => $field['label'], 'type' => $field['type'] ), 'meta_name' => $t['name'],
+			'draft_value' => isset( $draft['meta'][ $t['name'] ] ) ? $draft['meta'][ $t['name'] ] : '', 'live_value' => isset( $live['meta'][ $t['name'] ] ) ? $live['meta'][ $t['name'] ] : '',
+			'where_stored' => 'wp_postmeta "' . $t['name'] . '" of post ' . $t['post'] );
 	} else {
 		$field = livecrafts_acf_field( $t['key'], $t['post'] );
 		if ( ! $field ) return new WP_Error( 'livecrafts_no_field', 'That ACF field is not part of this page.', array( 'status' => 404 ) );

@@ -96,6 +96,35 @@ function livecrafts_kinds() {
 				return array( 'css.rule', $c['target'], array( 'selector' => $p['selector'], 'media' => $p['media'], 'declarations' => (array) $p['before'], 'replace' => true ), array( 'label' => $p['label'] ) );
 			},
 		),
+		// An ACF value anywhere: top level, inside a group, or in a repeater / flexible content row. Target = its meta name.
+		'acf.value' => array(
+			'object'  => 'post',
+			'prepare' => 'livecrafts_kind_acf_value_prepare',
+			'read'    => function ( $data, $target ) { return isset( $data['meta'][ $target ] ) ? $data['meta'][ $target ] : ''; },
+			'apply'   => function ( &$data, $target, $after, $payload ) {
+				$data['meta'][ $target ]       = $after;
+				$data['meta'][ '_' . $target ] = $payload['key'];
+				return true;
+			},
+		),
+		// Rows of a repeater / flexible content field: add, remove, move, duplicate. Target = the field's meta name.
+		'acf.rows' => array(
+			'object'  => 'post',
+			'group'   => function ( $target ) { return 'acf-rows:' . $target; },
+			'prepare' => 'livecrafts_kind_acf_rows_prepare',
+			'read'    => function ( $data, $target ) {
+				$out     = array();
+				$pattern = '/^_?' . preg_quote( $target, '/' ) . '(_\d+_|$)/';
+				foreach ( $data['meta'] as $k => $v ) if ( preg_match( $pattern, $k ) ) $out[ $k ] = $v;
+				ksort( $out );
+				return $out;
+			},
+			'apply'   => function ( &$data, $target, $after ) {
+				$data['meta'] = livecrafts_acf_rows_apply( $data['meta'], $target, (array) $after );
+				return true;
+			},
+			'revert'  => 'livecrafts_acf_rows_revert',
+		),
 		// A few post settings stored as meta: featured image, page template, menu link address / new tab.
 		'post.meta' => array(
 			'object'  => 'post',
@@ -346,4 +375,103 @@ function livecrafts_kind_post_meta_prepare( $post_id, $target, $value, array $dr
 			return array( 'target' => $target, 'after' => $clean, 'payload' => array(), 'summary' => 'Menu link “' . get_post_field( 'post_title', $post_id ) . '”: ' . ( $clean ? 'opens in a new tab' : 'opens in the same tab' ) );
 	}
 	return livecrafts_bad_value( 'Unknown setting.' );
+}
+
+/* ------------------------------------------------------------------ ACF values and rows */
+
+function livecrafts_kind_acf_value_prepare( $post_id, $target, $value, array $draft ) {
+	if ( ! livecrafts_acf_active() ) return new WP_Error( 'livecrafts_no_acf', 'ACF is not active on this site.', array( 'status' => 400 ) );
+	if ( ! preg_match( '/^[A-Za-z0-9_-]{1,190}$/', (string) $target ) ) return livecrafts_bad_value( 'An ACF value is addressed by its meta name, e.g. hero_title or sections_0_title.' );
+	$field = livecrafts_acf_field_of( $draft, $target );
+	if ( ! $field ) return new WP_Error( 'livecrafts_no_field', 'There is no ACF value "' . $target . '" on this page.', array( 'status' => 404 ) );
+	if ( ! in_array( $field['type'], livecrafts_supported_types(), true ) ) return livecrafts_bad_value( 'ACF field type "' . $field['type'] . '" cannot be edited this way.' );
+	$clean = livecrafts_validate_acf_value( $field, $value );
+	if ( is_wp_error( $clean ) ) return $clean;
+	$old  = isset( $draft['meta'][ $target ] ) ? $draft['meta'][ $target ] : '';
+	$show = function ( $v ) use ( $field ) { return $field['type'] === 'image' ? livecrafts_quote( $v ? wp_get_attachment_url( (int) $v ) : '(none)' ) : livecrafts_quote( $v ); };
+	$where = preg_match( '/_(\d+)_[^_]/', $target, $m ) ? ' (row ' . ( (int) $m[1] + 1 ) . ')' : '';
+	return array(
+		'target'  => $target,
+		'after'   => $clean,
+		'payload' => array( 'key' => $field['key'], 'label' => $field['label'], 'type' => $field['type'] ),
+		'summary' => 'ACF ' . $field['label'] . $where . ': ' . $show( $old ) . ' → ' . $show( $clean ),
+	);
+}
+
+/**
+ * $value = array( 'op' => 'add'|'remove'|'move'|'duplicate', 'index' => n, 'to' => n|'up'|'down', 'layout' => name )
+ * 'add' without index adds at the end; a flexible content row needs its layout.
+ */
+function livecrafts_kind_acf_rows_prepare( $post_id, $target, $value, array $draft, array $args ) {
+	if ( ! livecrafts_acf_active() ) return new WP_Error( 'livecrafts_no_acf', 'ACF is not active on this site.', array( 'status' => 400 ) );
+	$field = preg_match( '/^[A-Za-z0-9_-]{1,190}$/', (string) $target ) ? livecrafts_acf_field_of( $draft, $target ) : null;
+	if ( ! $field || ! in_array( $field['type'], array( 'repeater', 'flexible_content' ), true ) ) {
+		return new WP_Error( 'livecrafts_no_field', 'There is no repeater or flexible content field "' . $target . '" on this page.', array( 'status' => 404 ) );
+	}
+	if ( ! is_array( $value ) || empty( $value['op'] ) ) return livecrafts_bad_value( 'Say what to do with the rows: {op: add|remove|move|duplicate, index, to, layout}.' );
+	$layouts = livecrafts_acf_row_layouts( $field, isset( $draft['meta'][ $target ] ) ? $draft['meta'][ $target ] : '' );
+	$count   = count( $layouts );
+	$op      = (string) $value['op'];
+	$i       = isset( $value['index'] ) && $value['index'] !== '' ? (int) $value['index'] : ( $op === 'add' ? $count : -1 );
+	$max     = ! empty( $field['max'] ) ? (int) $field['max'] : 0;
+	$min     = ! empty( $field['min'] ) ? (int) $field['min'] : 0;
+	$label   = $field['label'] !== '' ? $field['label'] : $field['name'];
+	$after   = array( 'op' => $op, 'index' => $i, 'type' => $field['type'] );
+	$payload = array( 'key' => $field['key'], 'label' => $label );
+	$in      = function ( $n ) use ( $count ) { return $n >= 0 && $n < $count; };
+
+	switch ( $op ) {
+		case 'add':
+			if ( $i < 0 || $i > $count ) return livecrafts_bad_value( 'A row can be added at positions 0 to ' . $count . '.' );
+			if ( $max && $count >= $max ) return livecrafts_bad_value( '“' . $label . '” allows at most ' . $max . ' rows.' );
+			$layout = '';
+			if ( $field['type'] === 'flexible_content' ) {
+				$layout = isset( $value['layout'] ) ? (string) $value['layout'] : '';
+				if ( ! livecrafts_acf_row_fields( $field, $layout ) && ! in_array( $layout, wp_list_pluck( (array) $field['layouts'], 'name' ), true ) ) {
+					return livecrafts_bad_value( 'Choose a layout: ' . implode( ', ', wp_list_pluck( (array) $field['layouts'], 'name' ) ) . '.' );
+				}
+			}
+			// Only a revert may bring back a row's own data; everything else starts from an empty row.
+			$row = ! empty( $args['restore_row'] ) && isset( $value['row'] ) && is_array( $value['row'] ) ? $value['row'] : livecrafts_acf_blank_row( livecrafts_acf_row_fields( $field, $layout ) );
+			$after += array( 'layout' => $layout, 'row' => $row );
+			$summary = 'Add ' . ( $layout !== '' ? '“' . $layout . '” ' : 'a ' ) . 'row to ' . $label;
+			break;
+		case 'remove':
+			if ( ! $in( $i ) ) return livecrafts_bad_value( 'There is no row ' . ( $i + 1 ) . ' in ' . $label . '.' );
+			if ( $min && $count <= $min ) return livecrafts_bad_value( '“' . $label . '” needs at least ' . $min . ' rows.' );
+			$payload['removed_row']    = livecrafts_acf_row_meta( $draft['meta'], $target, $i );
+			$payload['removed_layout'] = $layouts[ $i ];
+			$summary = 'Remove row ' . ( $i + 1 ) . ' of ' . $label;
+			break;
+		case 'duplicate':
+			if ( ! $in( $i ) ) return livecrafts_bad_value( 'There is no row ' . ( $i + 1 ) . ' in ' . $label . '.' );
+			if ( $max && $count >= $max ) return livecrafts_bad_value( '“' . $label . '” allows at most ' . $max . ' rows.' );
+			$summary = 'Duplicate row ' . ( $i + 1 ) . ' of ' . $label;
+			break;
+		case 'move':
+			$to = isset( $value['to'] ) ? $value['to'] : null;
+			$to = $to === 'up' ? $i - 1 : ( $to === 'down' ? $i + 1 : ( is_numeric( $to ) ? (int) $to : -1 ) );
+			if ( ! $in( $i ) || ! $in( $to ) ) return livecrafts_bad_value( 'Rows of ' . $label . ' are numbered 0 to ' . ( $count - 1 ) . '.' );
+			if ( $to === $i ) return array( 'unchanged' => true, 'target' => $target, 'after' => null, 'payload' => array(), 'summary' => '' );
+			$after['to'] = $to;
+			$summary = 'Move row ' . ( $i + 1 ) . ' of ' . $label . ' ' . ( $to < $i ? 'up' : 'down' );
+			break;
+		default:
+			return livecrafts_bad_value( 'Unknown row operation "' . $op . '".' );
+	}
+	return array( 'target' => $target, 'after' => $after, 'payload' => $payload, 'summary' => $summary );
+}
+
+/** The opposite of a row change that went live. */
+function livecrafts_acf_rows_revert( array $c ) {
+	$a = $c['payload']['after'];
+	$i = (int) $a['index'];
+	switch ( $a['op'] ) {
+		case 'add':       return array( 'acf.rows', $c['target'], array( 'op' => 'remove', 'index' => $i ), array() );
+		case 'duplicate': return array( 'acf.rows', $c['target'], array( 'op' => 'remove', 'index' => $i + 1 ), array() );
+		case 'move':      return array( 'acf.rows', $c['target'], array( 'op' => 'move', 'index' => (int) $a['to'], 'to' => $i ), array() );
+		case 'remove':
+			return array( 'acf.rows', $c['target'], array( 'op' => 'add', 'index' => $i, 'layout' => $c['payload']['removed_layout'], 'row' => $c['payload']['removed_row'] ), array( 'restore_row' => true ) );
+	}
+	return new WP_Error( 'livecrafts_no_revert', 'This row change cannot be reverted automatically.' );
 }
