@@ -23,6 +23,7 @@ require_once LIVECRAFTS_DIR . 'includes/snapshots.php';
 require_once LIVECRAFTS_DIR . 'includes/targets.php';
 require_once LIVECRAFTS_DIR . 'includes/elementor.php';
 require_once LIVECRAFTS_DIR . 'includes/css.php';
+require_once LIVECRAFTS_DIR . 'includes/blocks.php';
 require_once LIVECRAFTS_DIR . 'includes/kinds.php';
 require_once LIVECRAFTS_DIR . 'includes/drafts.php';
 require_once LIVECRAFTS_DIR . 'includes/preview.php';

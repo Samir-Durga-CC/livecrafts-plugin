@@ -11,10 +11,18 @@
  *     'read'    => fn( array $data, $target, array $payload ) -> the current value of that target
  *     'apply'   => fn( array &$data, $target, $after, array $payload ) -> true | WP_Error
  *     'equal'   => optional fn( $a, $b, $target ) -> bool (default: livecrafts_same)
+ *     'group'   => optional string or Closure( $target ): changes in one group are checked for conflicts together
+ *                  (default: each target on its own)
+ *     'base'    => optional fn( array $data, $target, array $payload ): what a conflict check compares (default: read)
+ *     'landed'  => optional fn( array $saved, array $expected ) -> bool: did the write really land (default: read + equal)
+ *     'revert'  => optional fn( array $change ) -> array( kind, target, value, args ): the opposite of a live change
+ *                  (default: the same kind with the old value)
  *   )
+ *   prepare may return 'unchanged' => true when the value is already what was asked.
  *
- * A draft change stores before (the value when it was made) and after. When deploying, the first "before" of each
- * target must still match the live site - otherwise someone changed it meanwhile and the person decides (conflict).
+ * A draft change stores before (the value in the draft when it was made), after, and base: a fingerprint of the LIVE
+ * value when it was made. When deploying, the live value must still match base - otherwise someone changed it
+ * meanwhile and the person decides (conflict).
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -23,6 +31,7 @@ function livecrafts_kinds() {
 	return array(
 		'post.field' => array(
 			'object'  => 'post',
+			'group'   => function ( $target ) { return $target === 'content' ? 'content' : 'field:' . $target; },
 			'prepare' => 'livecrafts_kind_post_field_prepare',
 			'read'    => function ( $data, $target ) { return isset( $data['fields'][ $target ] ) ? $data['fields'][ $target ] : ''; },
 			'apply'   => function ( &$data, $target, $after ) { $data['fields'][ $target ] = (string) $after; return true; },
@@ -87,6 +96,16 @@ function livecrafts_kinds() {
 				return array( 'css.rule', $c['target'], array( 'selector' => $p['selector'], 'media' => $p['media'], 'declarations' => (array) $p['before'], 'replace' => true ), array( 'label' => $p['label'] ) );
 			},
 		),
+		// Blocks inside the page content (blocks.php).
+		'block.text'      => livecrafts_block_kind( 'text' ),
+		'block.link'      => livecrafts_block_kind( 'link' ),
+		'block.image'     => livecrafts_block_kind( 'image' ),
+		'block.class'     => livecrafts_block_kind( 'class' ),
+		'block.replace'   => livecrafts_block_kind( 'replace' ),
+		'block.insert'    => livecrafts_block_kind( 'insert' ),
+		'block.remove'    => livecrafts_block_kind( 'remove' ),
+		'block.move'      => livecrafts_block_kind( 'move' ),
+		'block.duplicate' => livecrafts_block_kind( 'duplicate' ),
 		// Put a whole object back to a recorded state (revert of a change made outside Livecrafts, or of a reset).
 		'object.restore' => array(
 			'object'  => 'any',
@@ -98,8 +117,30 @@ function livecrafts_kinds() {
 }
 
 function livecrafts_kind( $name ) {
-	$all = livecrafts_kinds();
+	static $all = null;
+	if ( $all === null ) $all = livecrafts_kinds();
 	return isset( $all[ $name ] ) ? $all[ $name ] : null;
+}
+
+/** The conflict group of a change (see the kind interface above). */
+function livecrafts_kind_group( array $kind, $target ) {
+	if ( ! isset( $kind['group'] ) ) return 'target:' . $target;
+	return $kind['group'] instanceof Closure ? call_user_func( $kind['group'], $target ) : $kind['group'];
+}
+
+/** Fingerprint of what a change depends on, in a data array (stored as payload base, compared when deploying). */
+function livecrafts_kind_base( array $kind, array $data, $target, array $payload ) {
+	$value = isset( $kind['base'] ) ? call_user_func( $kind['base'], $data, $target, $payload ) : call_user_func( $kind['read'], $data, $target, $payload );
+	return md5( (string) wp_json_encode( $value ) );
+}
+
+/** Did a change land in $saved (the preview copy, or the live site after deploy) as in $expected? */
+function livecrafts_kind_landed( array $kind, $saved, array $expected, $target, array $payload ) {
+	if ( ! $saved ) return false;
+	if ( isset( $kind['landed'] ) ) return (bool) call_user_func( $kind['landed'], $saved, $expected );
+	$a = call_user_func( $kind['read'], $saved, $target, $payload );
+	$b = call_user_func( $kind['read'], $expected, $target, $payload );
+	return isset( $kind['equal'] ) ? (bool) call_user_func( $kind['equal'], $a, $b, $target ) : livecrafts_same( $a, $b );
 }
 
 function livecrafts_data_hash( $data ) {

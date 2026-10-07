@@ -36,21 +36,27 @@ function livecrafts_draft_groups( $ids = null ) {
 	return $groups;
 }
 
-/** Draft targets whose live value is no longer what the draft started from. */
+/** Draft changes whose live value changed after the draft change was made (someone edited it meanwhile). */
 function livecrafts_conflicts( array $live, array $changes ) {
 	$seen = array();
 	$out  = array();
 	foreach ( $changes as $c ) {
 		$kind = livecrafts_kind( $c['kind'] );
-		if ( ! $kind || isset( $seen[ $c['target'] ] ) ) continue;
-		$seen[ $c['target'] ] = true;
-		$was = isset( $c['payload']['before'] ) ? $c['payload']['before'] : null;
+		if ( ! $kind ) continue;
+		$group = livecrafts_kind_group( $kind, $c['target'] );
+		if ( isset( $seen[ $group ] ) ) continue;
+		$seen[ $group ] = true;
 		$now = call_user_func( $kind['read'], $live, $c['target'], $c['payload'] );
-		$eq  = isset( $kind['equal'] ) ? call_user_func( $kind['equal'], $now, $was, $c['target'] ) : livecrafts_same( $now, $was );
-		if ( ! $eq ) {
-			$out[] = array( 'change' => $c['id'], 'summary' => $c['summary'], 'target' => $c['target'], 'draft_started_from' => livecrafts_shorten( $was, 200 ), 'live_now' => livecrafts_shorten( $now, 200 ) );
+		if ( isset( $c['payload']['base'] ) ) {
+			$eq = livecrafts_kind_base( $kind, $live, $c['target'], $c['payload'] ) === $c['payload']['base'];
+		} else { // changes stored before fingerprints existed
+			$was = isset( $c['payload']['before'] ) ? $c['payload']['before'] : null;
+			$eq  = isset( $kind['equal'] ) ? call_user_func( $kind['equal'], $now, $was, $c['target'] ) : livecrafts_same( $now, $was );
 		}
-		if ( $c['kind'] === 'object.restore' ) break; // later changes were made on top of the restored state
+		if ( ! $eq ) {
+			$out[] = array( 'change' => $c['id'], 'summary' => $c['summary'], 'target' => $c['target'],
+				'draft_started_from' => livecrafts_shorten( isset( $c['payload']['before'] ) ? $c['payload']['before'] : null, 200 ), 'live_now' => livecrafts_shorten( $now, 200 ) );
+		}
 	}
 	return $out;
 }
@@ -152,10 +158,7 @@ function livecrafts_verify_commit( $want, $after, array $changes ) {
 			}
 			continue;
 		}
-		$a  = call_user_func( $kind['read'], $want, $c['target'], $c['payload'] );
-		$b  = call_user_func( $kind['read'], $after, $c['target'], $c['payload'] );
-		$eq = isset( $kind['equal'] ) ? call_user_func( $kind['equal'], $a, $b, $c['target'] ) : livecrafts_same( $a, $b );
-		if ( ! $eq ) $wrong[] = '“' . $c['summary'] . '”';
+		if ( ! livecrafts_kind_landed( $kind, $after, $want, $c['target'], $c['payload'] ) ) $wrong[] = '“' . $c['summary'] . '”';
 	}
 	return array_values( array_unique( $wrong ) );
 }

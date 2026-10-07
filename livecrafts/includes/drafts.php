@@ -178,6 +178,7 @@ function livecrafts_change_create( $kind_name, $object_type, $object_id, $target
 	$args['object_type'] = $object_type;
 	$p = call_user_func( $kind['prepare'], $object_id, $target, $value, $draft, $args, $actor );
 	if ( is_wp_error( $p ) ) return $p;
+	if ( ! empty( $p['unchanged'] ) ) return array( 'ok' => true, 'unchanged' => true, 'message' => 'It already is that way.' );
 
 	$before = array_key_exists( 'before', $p ) ? $p['before'] : call_user_func( $kind['read'], $draft, $p['target'], $p['payload'] );
 	$same   = isset( $kind['equal'] ) ? call_user_func( $kind['equal'], $before, $p['after'], $p['target'] ) : livecrafts_same( $before, $p['after'] );
@@ -186,6 +187,8 @@ function livecrafts_change_create( $kind_name, $object_type, $object_id, $target
 	$test = $draft; // try it before storing anything
 	$r    = call_user_func_array( $kind['apply'], array( &$test, $p['target'], $p['after'], $p['payload'] ) );
 	if ( is_wp_error( $r ) ) return $r;
+	// What the live site has now for this change: if that differs when deploying, someone changed it meanwhile.
+	$base = livecrafts_kind_base( $kind, livecrafts_object_data( $object_type, $object_id ), $p['target'], $p['payload'] );
 
 	$id = livecrafts_change_insert( array(
 		'status'      => 'draft',
@@ -196,7 +199,7 @@ function livecrafts_change_create( $kind_name, $object_type, $object_id, $target
 		'kind'        => $kind_name,
 		'target'      => $p['target'],
 		'summary'     => $p['summary'],
-		'payload'     => array_merge( $p['payload'], array( 'before' => $before, 'after' => $p['after'] ) ),
+		'payload'     => array_merge( $p['payload'], array( 'before' => $before, 'after' => $p['after'], 'base' => $base ) ),
 		'ref'         => isset( $opts['ref'] ) ? $opts['ref'] : '',
 		'reverts'     => isset( $opts['reverts'] ) ? $opts['reverts'] : null,
 	) );
@@ -205,9 +208,7 @@ function livecrafts_change_create( $kind_name, $object_type, $object_id, $target
 	$refresh = livecrafts_draft_refresh( $object_type, $object_id );
 	$landed  = ! is_wp_error( $refresh );
 	if ( $landed && $object_type === 'post' && $kind_name !== 'object.restore' ) {
-		$copy   = livecrafts_draft_copy_data( $object_id );
-		$now    = $copy ? call_user_func( $kind['read'], $copy, $p['target'], $p['payload'] ) : null;
-		$landed = isset( $kind['equal'] ) ? call_user_func( $kind['equal'], $now, $p['after'], $p['target'] ) : livecrafts_same( $now, $p['after'] );
+		$landed = livecrafts_kind_landed( $kind, livecrafts_draft_copy_data( $object_id ), $test, $p['target'], $p['payload'] );
 	}
 	if ( ! $landed ) {
 		livecrafts_change_update( $id, array( 'status' => 'discarded' ) );
