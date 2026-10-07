@@ -50,7 +50,17 @@ function livecrafts_rest_resolve( WP_REST_Request $req ) {
 		$r = livecrafts_resolve_elementor( (int) $el['doc'], (string) $el['id'], $device );
 	}
 	if ( ! $r && preg_match( '/^(\d+):(\d{1,4}(?:\.\d{1,4}){0,9})$/', $block, $m ) && current_user_can( 'edit_post', (int) $m[1] ) ) {
-		$r = livecrafts_resolve_block( (int) $m[1], $m[2], $device );
+		// A block that shows an ACF field (block bindings, source "acf/field"): the source is the field, not the block.
+		$data  = livecrafts_draft_data( 'post', (int) $m[1] );
+		$b     = is_wp_error( $data ) ? null : livecrafts_block_get( parse_blocks( $data['fields']['content'] ), $m[2] );
+		$bound = $b && isset( $b['attrs']['metadata']['bindings'] ) && is_array( $b['attrs']['metadata']['bindings'] ) ? $b['attrs']['metadata']['bindings'] : array();
+		foreach ( $bound as $binding ) {
+			if ( isset( $binding['source'], $binding['args']['key'] ) && $binding['source'] === 'acf/field' ) {
+				$r = livecrafts_resolve_acf_name( (int) $m[1], (string) $binding['args']['key'] );
+				if ( $r ) break;
+			}
+		}
+		if ( ! $r ) $r = livecrafts_resolve_block( (int) $m[1], $m[2], $device );
 	}
 	if ( ! $r && $page && current_user_can( 'edit_post', $page ) ) {
 		$r = livecrafts_resolve_acf( $page, $req );
@@ -293,6 +303,26 @@ function livecrafts_resolve_acf( $page, WP_REST_Request $req ) {
 		'actions' => $actions,
 		'notes'   => array(),
 	);
+}
+
+/** An ACF field by its name (a block bound to it). */
+function livecrafts_resolve_acf_name( $page, $name ) {
+	if ( ! livecrafts_acf_active() ) return null;
+	$data = livecrafts_draft_data( 'post', $page );
+	if ( is_wp_error( $data ) ) return null;
+	foreach ( livecrafts_acf_scan( $page, $data ) as $e ) {
+		if ( $e['kind'] !== 'acf' || $e['name'] !== $name ) continue;
+		$nested = strpos( $e['tid'], 'acfv:' ) === 0;
+		$change = $nested ? array( 'kind' => 'acf.value', 'post' => $page, 'target' => $e['name'] ) : array( 'kind' => 'acf.field', 'post' => $page, 'target' => $e['key'] );
+		$input  = $e['ftype'] === 'image' ? 'image' : ( $e['ftype'] === 'wysiwyg' ? 'html' : ( in_array( $e['ftype'], array( 'url', 'email' ), true ) ? 'url' : 'text' ) );
+		$value  = $e['ftype'] === 'image' ? array( 'id' => $e['value'], 'url' => $e['url'] ) : $e['value'];
+		return array(
+			'source'  => array( 'kind' => 'acf', 'label' => $e['label'], 'post' => $page, 'field' => $e['key'], 'meta' => $e['name'], 'type' => $e['ftype'], 'where' => livecrafts_object_label( 'post', $page ), 'edit_link' => get_edit_post_link( $page, 'raw' ) ),
+			'actions' => array( livecrafts_action( 'acf:value', 'content', $e['ftype'] === 'image' ? 'Replace image' : 'Edit ' . strtolower( $e['label'] ), $input, $value, $change ) ),
+			'notes'   => array(),
+		);
+	}
+	return null;
 }
 
 /* ------------------------------------------------------------------ menu links */
