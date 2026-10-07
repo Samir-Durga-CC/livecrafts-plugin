@@ -116,6 +116,19 @@ add_filter( 'single_post_title', function ( $title, $post = null ) {
 	return $copy ? get_post_field( 'post_title', $copy, 'raw' ) : $title;
 }, 1, 2 );
 
+// Menu links are read without query filters: give a link with a draft its draft label (its address and target are
+// meta, which the meta filter above already serves from the draft).
+add_filter( 'wp_setup_nav_menu_item', function ( $item ) {
+	if ( ! isset( $item->ID ) || ! isset( $item->post_type ) || $item->post_type !== 'nav_menu_item' ) return $item;
+	$copy = livecrafts_preview_copy( (int) $item->ID );
+	if ( ! $copy ) return $item;
+	$title = get_post_field( 'post_title', $copy, 'raw' );
+	if ( $title !== '' ) $item->title = $title;
+	$item->url    = (string) get_post_meta( $item->ID, '_menu_item_url', true ) ?: $item->url;
+	$item->target = (string) get_post_meta( $item->ID, '_menu_item_target', true );
+	return $item;
+}, 1 );
+
 /* ------------------------------------------------------------------ Elementor CSS */
 
 // Elementor enqueues the page's generated CSS (the LIVE design). For a page with a draft, use Elementor's own preview

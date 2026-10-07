@@ -26,11 +26,12 @@ function livecrafts_meta_tracked( $key ) {
 	return true;
 }
 
-/** Post types whose changes are tracked: everything public except media (pages, posts, products, Elementor templates ...). */
+/** Post types whose changes are tracked: everything public except media (pages, posts, products ...), menu links, Elementor and block templates. */
 function livecrafts_tracked_post_type( $type ) {
 	if ( $type === 'attachment' || $type === 'revision' ) return false;
+	if ( in_array( $type, array( 'nav_menu_item', 'elementor_library', 'wp_template', 'wp_template_part' ), true ) ) return true;
 	$obj = get_post_type_object( $type );
-	return $obj && ( $obj->public || $type === 'elementor_library' || $type === 'wp_template' || $type === 'wp_template_part' );
+	return $obj && $obj->public;
 }
 
 /**
