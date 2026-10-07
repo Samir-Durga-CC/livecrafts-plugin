@@ -1,10 +1,11 @@
 <?php
 /**
- * Site Bridge endpoints for the central Livecrafts backend (and anything else that talks to this site over REST).
- * Auth: a logged-in cookie + nonce, OR an Application Password (Users > Profile) over HTTPS - WordPress core handles both.
+ * Site Bridge endpoints for the Livecrafts backend:
  *
- *   GET /livecrafts/v1/ping                  who/what is this site, plugin version, what it can edit
- *   GET /livecrafts/v1/map?url=...|post=ID   every editable value on a page (ACF fields + Elementor settings), with stable target ids
+ *   GET /livecrafts/v1/ping                       who/what is this site, plugin version, what it can edit
+ *   GET /livecrafts/v1/map?url=...|post=ID        every editable value on a page (ACF fields + Elementor settings),
+ *                                                 with stable target ids. &view=live for the live values (default: draft,
+ *                                                 i.e. what editors see).
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -21,21 +22,24 @@ add_action( 'rest_api_init', function () {
 function livecrafts_rest_ping() {
 	$user = wp_get_current_user();
 	return array(
-		'ok'           => true,
-		'plugin'       => 'livecrafts',
-		'version'      => LIVECRAFTS_VERSION,
-		'site'         => array( 'name' => get_bloginfo( 'name' ), 'url' => home_url( '/' ), 'wp' => get_bloginfo( 'version' ), 'php' => PHP_VERSION ),
-		'user'         => array( 'login' => $user && $user->exists() ? $user->user_login : '', 'can_edit_pages' => current_user_can( 'edit_pages' ), 'can_edit_themes' => current_user_can( 'edit_themes' ) ),
+		'ok'      => true,
+		'plugin'  => 'livecrafts',
+		'version' => LIVECRAFTS_VERSION,
+		'site'    => array( 'name' => get_bloginfo( 'name' ), 'url' => home_url( '/' ), 'wp' => get_bloginfo( 'version' ), 'php' => PHP_VERSION ),
+		'user'    => array(
+			'login' => $user && $user->exists() ? $user->user_login : '', 'can_edit' => livecrafts_can_edit(), 'can_deploy' => livecrafts_can_deploy(),
+			'can_edit_pages' => current_user_can( 'edit_pages' ), 'can_edit_themes' => current_user_can( 'edit_themes' ), 'can_edit_css' => current_user_can( 'edit_css' ),
+		),
 		'capabilities' => array(
-			'acf'       => function_exists( 'get_field' ),
-			'elementor' => function_exists( 'livecrafts_el_active' ) && livecrafts_el_active(),
-			'targets'   => array( 'acf', 'el' ),
-			'endpoints' => array( 'ping', 'map', 'target', 'debug/target', 'debug/fields', 'debug/elementor', 'debug/locate', 'undo', 'save', 'revert', 'theme-files', 'theme-file', 'assistant', 'patches' ),
-			'manual'      => true,
+			'acf'         => livecrafts_acf_active(),
+			'elementor'   => livecrafts_el_active(),
+			'drafts'      => true,
+			'kinds'       => array_keys( livecrafts_kinds() ),
 			'theme_files' => current_user_can( 'edit_themes' ),
 			'theme'       => get_stylesheet(),
 			'block_theme' => function_exists( 'wp_is_block_theme' ) ? wp_is_block_theme() : false,
 		),
+		'drafts'  => livecrafts_draft_count(),
 	);
 }
 
@@ -46,7 +50,13 @@ function livecrafts_url_to_post( $url ) {
 	if ( untrailingslashit( $clean ) === untrailingslashit( $home ) && get_option( 'show_on_front' ) === 'page' && (int) get_option( 'page_on_front' ) ) {
 		return (int) get_option( 'page_on_front' );
 	}
-	return (int) url_to_postid( $url );
+	$id = (int) url_to_postid( $url );
+	if ( ! $id ) { // draft pages have no pretty URL yet: ?page_id= / ?p=
+		$query = array();
+		wp_parse_str( (string) wp_parse_url( $url, PHP_URL_QUERY ), $query );
+		$id = ! empty( $query['page_id'] ) ? (int) $query['page_id'] : ( ! empty( $query['p'] ) ? (int) $query['p'] : 0 );
+	}
+	return $id;
 }
 
 function livecrafts_rest_map( WP_REST_Request $req ) {
@@ -56,14 +66,19 @@ function livecrafts_rest_map( WP_REST_Request $req ) {
 	if ( ! $post || ! get_post( $post ) ) return new WP_Error( 'livecrafts_no_page', 'Could not map that URL to a page on this site. Pass a full page URL of this site, or a post id.', array( 'status' => 404 ) );
 	if ( ! current_user_can( 'edit_post', $post ) ) return new WP_Error( 'livecrafts_forbidden', 'You cannot edit this page.', array( 'status' => 403 ) );
 
-	$acf = livecrafts_scan_fields( $post );
-	$el  = livecrafts_el_scan( $post );
+	$view = $req->get_param( 'view' ) === 'live' ? 'live' : 'draft';
+	$data = $view === 'live' ? livecrafts_post_data( $post ) : livecrafts_draft_data( 'post', $post );
+	if ( is_wp_error( $data ) ) return $data;
+	$acf = livecrafts_acf_scan( $post, $data );
+	$el  = livecrafts_el_scan( $post, $data );
 	return array(
 		'ok'        => true,
-		'post'      => array( 'id' => $post, 'type' => get_post_type( $post ), 'title' => get_the_title( $post ), 'status' => get_post_status( $post ), 'url' => get_permalink( $post ), 'edit_link' => get_edit_post_link( $post, 'raw' ) ),
-		'builders'  => array( 'elementor' => (bool) get_post_meta( $post, '_elementor_data', true ), 'acf_fields' => count( $acf ), 'elementor_settings' => count( $el ) ),
+		'view'      => $view,
+		'post'      => array( 'id' => $post, 'type' => get_post_type( $post ), 'title' => $data['fields']['title'], 'status' => get_post_status( $post ), 'url' => get_permalink( $post ), 'edit_link' => get_edit_post_link( $post, 'raw' ) ),
+		'builders'  => array( 'elementor' => ! empty( $data['meta']['_elementor_data'] ), 'acf_fields' => count( $acf ), 'elementor_settings' => count( $el ) ),
 		'acf'       => $acf,
 		'elementor' => $el,
-		'note'      => 'Each entry has a stable target id (tid). Use it with POST /target. Text that is not listed here is not linked to ACF/Elementor (it may be post content, a menu, a widget or hard-coded).',
+		'drafts'    => count( livecrafts_draft_changes( 'post', $post ) ),
+		'note'      => 'Each entry has a stable target id (tid). Change it with POST /changes (kind acf.field target <field key>, or kind el.setting target <element id>:<setting>). Text not listed here is not in ACF/Elementor (it may be block content, a menu, a widget or the theme).',
 	);
 }

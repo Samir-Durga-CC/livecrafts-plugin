@@ -1,26 +1,47 @@
-# Livecrafts (prototype v0.5)
+# Livecrafts (WordPress plugin, 0.10)
 
-Click any element on any WordPress page, find its REAL source (ACF field / Elementor setting), change it, and verify the change.
-Where no source is found it falls back to a non-destructive patch (CSS + text) stored in the database.
-The DORA Live Editor (`dora-agent/plugin-template`) remains the editor for DORA-generated sites that carry `data-dora-id`.
+Edit a live WordPress site with an AI assistant or by clicking on the page - safely:
 
-## Files (`livecrafts/livecrafts/`)
+* **Drafts first.** Every change is a draft. Logged-in editors see it on the site (preview); visitors see the live site
+  until someone **deploys**. Deploying asks for a password (the person's WordPress password, or a separate deploy
+  password set in Settings → Livecrafts).
+* **Real sources, no patches.** Changes go into the place the content really lives - Elementor settings (saved with
+  Elementor's own `Document::save()`), ACF fields (`update_field`), post title/content/excerpt (`wp_update_post`) and,
+  for site-wide styles, WordPress's Additional CSS in named `livecrafts:` blocks. `!important` is refused.
+* **Complete history.** Every change is recorded with who, from where (assistant, widget, WP admin, Elementor editor),
+  before and after - including changes made outside Livecrafts. Every change can be reverted.
+* **Releases.** Each deploy is a release with notes. The site can be reset to any earlier release or to a baseline
+  (e.g. the moment it was handed over to the client).
+* **Notes.** The assistant keeps notes about the site and each page, stored in WordPress.
+
+## Files (`livecrafts/`)
 | File | Job |
 |---|---|
-| `livecrafts.php` | Bootstrap. Prints saved CSS for all visitors, loads the editor only for logged-in editors. |
-| `includes/store.php` | Patch storage, CSS allowlist, selector/value validation, activity log. |
-| `includes/targets.php` | ACF scan + render trace, verified ACF write-back (validate -> write -> READ BACK -> rollback), debug endpoints. |
-| `includes/elementor.php` | Elementor adapter: widget id -> setting, saved through Elementor's own `save()`, verified by read-back. |
-| `includes/audit.php` | `POST debug/locate`: where in the database does a given text live (diagnostic). |
-| `includes/rest.php` | REST routes: save, revert, undo, target, debug/*. Needs login + nonce (or an Application Password). |
-| `includes/admin.php` | Settings > Livecrafts: patches + activity log. |
-| `assets/editor.js` | The editor UI, resolvers (ACF / Elementor / patch), save + page verification, Debug box, `window.Livecrafts.*`. |
+| `livecrafts.php` | Bootstrap, activation (tables, capabilities, secret, migration). |
+| `includes/schema.php` | Tables: `livecrafts_changes`, `livecrafts_releases`, `livecrafts_snapshots`. |
+| `includes/auth.php` | Capabilities `livecrafts_edit` / `livecrafts_deploy`, signed widget tokens, deploy password (5 tries, then 15 min lock). |
+| `includes/ledger.php` | The change history and releases. |
+| `includes/snapshots.php` | Object data (post fields + content meta, Additional CSS), snapshots, restore. |
+| `includes/kinds.php` | What can be changed and how: `post.field`, `acf.field`, `el.setting`, `css.block`, `object.restore`. |
+| `includes/drafts.php` | Draft = live + draft changes; preview copies; create / revert / discard; new pages as drafts. |
+| `includes/preview.php` | Editors see drafts on the front end; visitors never do; Elementor caches never store draft output. |
+| `includes/watch.php` | Records changes made outside Livecrafts (WP admin, block editor, Elementor editor, ACF, Customizer). |
+| `includes/deploy.php` | Deploy (check everything → write with each source's own API → read back → snapshot), reset, baseline. |
+| `includes/notes.php` | Site and page notes. |
+| `includes/rest.php`, `includes/bridge.php` | REST API `livecrafts/v1/*` (see the comment at the top of rest.php). |
+| `includes/targets.php`, `includes/elementor.php`, `includes/css.php` | ACF, Elementor and Additional CSS helpers. |
+| `includes/migrate.php` | Moves the 0.9 overlay: styles → a draft CSS block to review; texts → a report. |
+| `includes/assistant.php`, `assets/widget.*` | The chat widget, the drafts bar (preview / live, discard, deploy dialog). |
+| `includes/admin.php` | Settings → Livecrafts: deploy password, old overlay, releases, recent changes. |
+| `includes/theme-files.php`, `includes/audit.php` | Theme file access for the backend; "where is this text stored" diagnostics. |
 
-## Measuring accuracy on any site: `Livecrafts.audit()`
-Read-only. Scans every visible text / link / image, reports how much is linked to a real source, checks that the stored value
-equals what the page shows (proves the mapping), and searches the database for what could not be linked.
-Console: `await Livecrafts.audit()`  -  Panel: Debug > Run site audit.
+## Testing
+`tests/integration.php` runs the whole flow against a **local** WordPress (it creates and deletes its own content):
+
+```bash
+php tests/integration.php "/path/to/wordpress"
+```
 
 ## Known limits
-- Sources covered: ACF top-level fields, Elementor classic widgets. Not yet: Gutenberg/post_content, WPBakery, Divi, menus/widgets/options, ACF repeaters.
-- Desktop styles only; fallback text patches are applied by JavaScript.
+* Elementor preview/deploy is implemented with Elementor's own APIs but not yet tested on a site with Elementor.
+* Menus, Gutenberg block-level operations, ACF repeaters and Elementor section operations come next.

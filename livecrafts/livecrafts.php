@@ -1,88 +1,81 @@
 <?php
 /**
  * Plugin Name: Livecrafts
- * Description: Click any element on any page and edit its text and style visually. Works on any theme or page builder because edits are saved as non-destructive "patches" (CSS + text) instead of changing theme files.
- * Version: 0.9.2
+ * Description: Edit your live site with an AI assistant or by clicking on the page. Every change is saved as a draft that only editors see; visitors see it after you deploy. Edits go into the real source (Elementor, blocks, ACF, Additional CSS) and every change can be reverted.
+ * Version: 0.10.0
+ * Requires at least: 6.2
+ * Requires PHP: 7.4
  * Author: Livecrafts
  * Text Domain: livecrafts
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'LIVECRAFTS_VERSION', '0.9.2' );
+define( 'LIVECRAFTS_VERSION', '0.10.0' );
+define( 'LIVECRAFTS_FILE', __FILE__ );
 define( 'LIVECRAFTS_DIR', plugin_dir_path( __FILE__ ) );
 define( 'LIVECRAFTS_URL', plugin_dir_url( __FILE__ ) );
 
-require_once LIVECRAFTS_DIR . 'includes/store.php';
+require_once LIVECRAFTS_DIR . 'includes/schema.php';
+require_once LIVECRAFTS_DIR . 'includes/auth.php';
+require_once LIVECRAFTS_DIR . 'includes/ledger.php';
+require_once LIVECRAFTS_DIR . 'includes/snapshots.php';
 require_once LIVECRAFTS_DIR . 'includes/targets.php';
 require_once LIVECRAFTS_DIR . 'includes/elementor.php';
+require_once LIVECRAFTS_DIR . 'includes/css.php';
+require_once LIVECRAFTS_DIR . 'includes/kinds.php';
+require_once LIVECRAFTS_DIR . 'includes/drafts.php';
+require_once LIVECRAFTS_DIR . 'includes/preview.php';
+require_once LIVECRAFTS_DIR . 'includes/watch.php';
+require_once LIVECRAFTS_DIR . 'includes/deploy.php';
+require_once LIVECRAFTS_DIR . 'includes/notes.php';
 require_once LIVECRAFTS_DIR . 'includes/rest.php';
 require_once LIVECRAFTS_DIR . 'includes/audit.php';
 require_once LIVECRAFTS_DIR . 'includes/bridge.php';
 require_once LIVECRAFTS_DIR . 'includes/theme-files.php';
 require_once LIVECRAFTS_DIR . 'includes/assistant.php';
+require_once LIVECRAFTS_DIR . 'includes/migrate.php';
 require_once LIVECRAFTS_DIR . 'includes/admin.php';
 
+register_activation_hook( __FILE__, 'livecrafts_activate' );
+
+/** Tables, capabilities and the site secret; then move data from older versions. Safe to run more than once. */
+function livecrafts_activate() {
+	livecrafts_install();
+	livecrafts_add_caps();
+	livecrafts_secret();
+	livecrafts_migrate();
+}
+
+// Updating the plugin files does not run the activation hook: catch up when the stored version is older.
+add_action( 'plugins_loaded', function () {
+	if ( get_option( 'livecrafts_version' ) !== LIVECRAFTS_VERSION ) {
+		livecrafts_activate();
+		update_option( 'livecrafts_version', LIVECRAFTS_VERSION );
+	}
+} );
+
 /**
- * Who may use the editor: any logged-in user who can edit pages.
- * Never load it inside builder previews (Elementor editor iframe, Customizer).
+ * Who may use the editor on the site: logged-in users with the livecrafts_edit capability.
+ * Never inside builder previews (the Elementor editor iframe, the Customizer).
  */
 function livecrafts_user_can_edit() {
-	if ( ! is_user_logged_in() || ! current_user_can( 'edit_pages' ) ) return false;
+	if ( ! is_user_logged_in() || ! livecrafts_can_edit() ) return false;
 	if ( isset( $_GET['elementor-preview'] ) || is_customize_preview() ) return false;
 	return true;
 }
 
-/**
- * 1) Saved style patches -> real CSS in <head> for EVERY visitor (server-rendered, no flash).
- *    !important so patches beat theme / Elementor / inline styles.
- */
-add_action( 'wp_head', function () {
-	$css = livecrafts_build_css( livecrafts_patches_for_page() );
-	if ( $css !== '' ) echo "<style id=\"livecrafts-patches\">\n" . $css . "</style>\n";
-}, 100 );
+/** Key identifying the page being viewed: "p<ID>" for posts/pages, "u:<md5 of path>" for archives and other URLs. */
+function livecrafts_page_key() {
+	if ( is_singular() || is_front_page() ) {
+		$id = ( is_front_page() && get_option( 'page_on_front' ) ) ? (int) get_option( 'page_on_front' ) : (int) get_queried_object_id();
+		if ( $id ) return 'p' . $id;
+	}
+	$path = wp_parse_url( add_query_arg( array() ), PHP_URL_PATH );
+	return 'u:' . md5( $path ? $path : '/' );
+}
 
-/**
- * 2) Saved text patches, without a "flash of old text".
- *    a) <head>: hide ONLY the elements that have a text patch (visibility keeps their layout, so nothing jumps).
- *    b) end of <body>: an inline script (no network request) swaps the text, then un-hides them.
- *    c) failsafe: if that script never runs, un-hide after 3s so content can never stay hidden.
- */
-add_action( 'wp_head', function () {
-	$text = livecrafts_text_patches( livecrafts_patches_for_page() );
-	if ( ! $text ) return;
-	$css = '';
-	foreach ( array_keys( $text ) as $sel ) $css .= $sel . '{visibility:hidden!important}';
-	echo '<style id="livecrafts-hide">' . $css . "</style>\n";
-	echo '<script>setTimeout(function(){var s=document.getElementById("livecrafts-hide");if(s)s.remove();},3000);</script>' . "\n";
-}, 99 );
-
-add_action( 'wp_footer', function () {
-	$text = livecrafts_text_patches( livecrafts_patches_for_page() );
-	if ( ! $text ) return;
-	$json = wp_json_encode( $text, JSON_HEX_TAG | JSON_HEX_AMP );
-	echo '<script id="livecrafts-apply">(function(){var m=' . $json . ';Object.keys(m).forEach(function(s){try{var e=document.querySelector(s);if(e)e.textContent=m[s];}catch(x){}});var h=document.getElementById("livecrafts-hide");if(h)h.remove();})();</script>' . "\n";
-}, 1 );
-
-/**
- * 3) The editor itself -> only for logged-in editors.
- */
-add_action( 'wp_enqueue_scripts', function () {
-	if ( is_admin() || ! livecrafts_user_can_edit() || ! livecrafts_classic_enabled() ) return; // the chat widget replaces it unless turned on
-
-	wp_enqueue_media(); // WordPress Media Library picker (wp.media) for image fields
-	wp_enqueue_script( 'livecrafts-editor', LIVECRAFTS_URL . 'assets/editor.js', array(), LIVECRAFTS_VERSION, true );
-
-	$key = livecrafts_page_key();
-	$all = livecrafts_get_all();
-	wp_localize_script( 'livecrafts-editor', 'LIVECRAFTS', array(
-		'restUrl' => esc_url_raw( rest_url( 'livecrafts/v1' ) ),
-		'nonce'   => wp_create_nonce( 'wp_rest' ),
-		'pageKey' => $key,
-		'patches' => array(
-			'site' => isset( $all['site'] ) ? (object) $all['site'] : new stdClass(),
-			'page' => isset( $all[ $key ] ) ? (object) $all[ $key ] : new stdClass(),
-		),
-		'props'   => livecrafts_allowed_props(),
-	) );
-}, 30 );
+/** The post the current page belongs to, or 0. */
+function livecrafts_current_post_id() {
+	return preg_match( '/^p(\d+)$/', livecrafts_page_key(), $m ) ? (int) $m[1] : 0;
+}

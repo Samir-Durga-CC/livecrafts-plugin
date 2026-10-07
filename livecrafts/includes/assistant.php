@@ -23,7 +23,6 @@ function livecrafts_assistant_defaults() {
 		'approval_mode'  => 'request',
 		'accent'         => '#5b5bd6',
 		'position'       => 'right',
-		'classic_editor' => 0,
 	);
 }
 
@@ -32,18 +31,11 @@ function livecrafts_assistant() {
 	return array_merge( livecrafts_assistant_defaults(), is_array( $saved ) ? $saved : array() );
 }
 
-/** The old click-to-edit panel is off by default now that the chat widget exists. */
-function livecrafts_classic_enabled() {
-	$a = livecrafts_assistant();
-	return ! empty( $a['classic_editor'] );
-}
-
 function livecrafts_assistant_sanitize( $in ) {
 	$d   = livecrafts_assistant_defaults();
 	$in  = is_array( $in ) ? $in : array();
 	$out = array();
 	$out['enabled']        = empty( $in['enabled'] ) ? 0 : 1;
-	$out['classic_editor'] = empty( $in['classic_editor'] ) ? 0 : 1;
 	$url                   = isset( $in['backend_url'] ) ? esc_url_raw( trim( $in['backend_url'] ), array( 'http', 'https' ) ) : '';
 	$out['backend_url']    = $url ? untrailingslashit( $url ) : $d['backend_url'];
 	$out['access_token']   = isset( $in['access_token'] ) ? sanitize_text_field( $in['access_token'] ) : '';
@@ -73,12 +65,12 @@ function livecrafts_assistant_page() {
 	?>
 	<div class="wrap">
 		<h1>Livecrafts Assistant</h1>
-		<p>An AI chat on your site for logged-in editors. It changes content, styles, pages and menus - with your approval, and every change can be reverted.</p>
+		<p>An AI chat on your site for logged-in editors. Its changes are drafts that only editors see until someone deploys them, and every change can be reverted.</p>
 		<form method="post" action="options.php">
 			<?php settings_fields( 'livecrafts_assistant' ); ?>
 			<h2 class="title">Assistant</h2>
 			<table class="form-table" role="presentation">
-				<tr><th scope="row">Show the chat widget</th><td><label><input type="checkbox" name="<?php echo esc_attr( $n ); ?>[enabled]" value="1" <?php checked( $a['enabled'], 1 ); ?>> Show the chat button on the site (only for logged-in users who can edit pages)</label></td></tr>
+				<tr><th scope="row">Show the chat widget</th><td><label><input type="checkbox" name="<?php echo esc_attr( $n ); ?>[enabled]" value="1" <?php checked( $a['enabled'], 1 ); ?>> Show the chat button on the site (only for logged-in users with the livecrafts_edit capability)</label></td></tr>
 				<tr><th scope="row"><label for="lc-bot-name">Bot name</label></th><td><input id="lc-bot-name" class="regular-text" name="<?php echo esc_attr( $n ); ?>[bot_name]" value="<?php echo esc_attr( $a['bot_name'] ); ?>"></td></tr>
 				<tr><th scope="row"><label for="lc-welcome">Welcome message</label></th><td><textarea id="lc-welcome" class="large-text" rows="2" name="<?php echo esc_attr( $n ); ?>[welcome]"><?php echo esc_textarea( $a['welcome'] ); ?></textarea></td></tr>
 				<tr><th scope="row"><label for="lc-instructions">Instructions (system prompt)</label></th><td><textarea id="lc-instructions" class="large-text code" rows="7" name="<?php echo esc_attr( $n ); ?>[instructions]" placeholder="e.g. Our brand colours are #0B3D91 and #FFB400. Write in British English. Never change the legal pages."><?php echo esc_textarea( $a['instructions'] ); ?></textarea>
@@ -99,7 +91,6 @@ function livecrafts_assistant_page() {
 					<p class="description">Where the Livecrafts app runs. On your own computer: <code>http://127.0.0.1:8790</code>.</p></td></tr>
 				<tr><th scope="row"><label for="lc-token">Backend access token</label></th><td><input id="lc-token" type="password" autocomplete="off" class="regular-text" name="<?php echo esc_attr( $n ); ?>[access_token]" value="<?php echo esc_attr( $a['access_token'] ); ?>">
 					<p class="description">Only if the backend has <code>LC_API_TOKEN</code> set. It is given only to logged-in editors.</p></td></tr>
-				<tr><th scope="row">Classic editor panel</th><td><label><input type="checkbox" name="<?php echo esc_attr( $n ); ?>[classic_editor]" value="1" <?php checked( $a['classic_editor'], 1 ); ?>> Also show the old “Edit” click-to-edit panel</label></td></tr>
 			</table>
 			<?php submit_button(); ?>
 		</form>

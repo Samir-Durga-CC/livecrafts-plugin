@@ -63,7 +63,9 @@
 		var cfg = {
 			siteUrl: C.siteUrl, pageUrl: location.href.split("#")[0], botName: C.botName, welcome: C.welcome, accent: C.accent,
 			approvalMode: C.approvalMode, token: C.token || "", user: C.user || "", parentOrigin: location.origin, tab: state.tab || "chat",
-			widgetVersion: C.version || "0.9.0", pageKey: C.pageKey || "",
+			widgetVersion: C.version || "0.9.0", pageKey: C.pageKey || "", postId: C.postId || 0,
+			// who the person is, signed by this site (the backend credits every change to them)
+			widgetToken: C.widgetToken || "", view: C.view || "draft", drafts: Number(C.drafts) || 0, canDeploy: !!C.canDeploy,
 		};
 		return C.backend.replace(/\/+$/, "") + "/?embed=1&v=" + encodeURIComponent(C.version || "") + "#cfg=" + encodeURIComponent(JSON.stringify(cfg));
 	}
@@ -490,6 +492,134 @@
 		job.then(function (result) { send({ type: "lc:eyes-result", id: d.id, ok: true, result: result }); },
 			function (e) { send({ type: "lc:eyes-result", id: d.id, ok: false, error: e && e.message ? e.message : String(e) }); });
 	}
+
+	// ------------------------------------------------------------------ drafts: preview / live, deploy, discard
+	// These talk to WordPress directly (cookie + nonce). The deploy password never leaves this site.
+	var drafts = { count: Number(C.drafts) || 0, view: C.view === "live" ? "live" : "draft" };
+	var bar = document.createElement("div");
+	bar.className = "lcw-draftbar";
+	bar.setAttribute("data-livecrafts", "draftbar");
+	bar.setAttribute("role", "region");
+	bar.setAttribute("aria-label", "Draft changes");
+	root.appendChild(bar);
+
+	function wp(method, path, body) {
+		return fetch(String(C.restUrl || "").replace(/\/?$/, "/") + path, {
+			method: method, credentials: "same-origin",
+			headers: { "Content-Type": "application/json", "X-WP-Nonce": C.nonce },
+			body: body ? JSON.stringify(body) : undefined,
+		}).then(function (r) {
+			return r.json().catch(function () { return {}; }).then(function (j) {
+				if (!r.ok) { var e = new Error(j && j.message ? j.message : "The site answered " + r.status + "."); e.code = j && j.code; e.data = j && j.data; throw e; }
+				return j;
+			});
+		});
+	}
+	function renderBar() {
+		var preview = drafts.view === "draft";
+		bar.hidden = drafts.count === 0 && preview;
+		bar.innerHTML =
+			'<span class="lcw-db-dot' + (preview ? "" : " lcw-db-live") + '" aria-hidden="true"></span>' +
+			'<span class="lcw-db-text">' + (preview
+				? "<b>Preview</b> · " + drafts.count + " unpublished change" + (drafts.count === 1 ? "" : "s")
+				: "<b>Live site</b> · drafts hidden") + "</span>" +
+			'<button type="button" class="lcw-db-btn" data-act="view">' + (preview ? "Show live" : "Show preview") + "</button>" +
+			(drafts.count ? '<button type="button" class="lcw-db-btn" data-act="discard">Discard all</button>' : "") +
+			(drafts.count && C.canDeploy ? '<button type="button" class="lcw-db-btn lcw-db-primary" data-act="deploy">Deploy…</button>' : "");
+	}
+	bar.addEventListener("click", function (e) {
+		var b = e.target.closest && e.target.closest("button[data-act]");
+		if (!b) return;
+		var act = b.getAttribute("data-act");
+		if (act === "view") setView(drafts.view === "draft" ? "live" : "draft");
+		else if (act === "discard") discardAll();
+		else if (act === "deploy") openDeploy();
+	});
+	function setView(view) {
+		document.cookie = "livecrafts_view=" + (view === "live" ? "live" : "draft") + "; path=/; SameSite=Lax" + (location.protocol === "https:" ? "; Secure" : "");
+		state.open = !panel.hidden; save();
+		hardReload();
+	}
+	function refreshDrafts() {
+		return wp("GET", "status").then(function (s) {
+			drafts.count = s && s.drafts ? Number(s.drafts.count) || 0 : 0;
+			renderBar();
+			send({ type: "lc:drafts", count: drafts.count, view: drafts.view, canDeploy: !!C.canDeploy });
+			return s;
+		}).catch(function () { /* keep the last known count */ });
+	}
+	function discardAll() {
+		if (!window.confirm("Discard all " + drafts.count + " unpublished change" + (drafts.count === 1 ? "" : "s") + "?\n\nThe live site is not touched. New pages that were never deployed go to the Trash.")) return;
+		wp("POST", "drafts/discard", {}).then(function () { state.open = !panel.hidden; save(); hardReload(); },
+			function (e) { window.alert("Could not discard: " + e.message); });
+	}
+
+	// The deploy dialog: what will go live, conflicts, notes, password.
+	var dialog = null;
+	function openDeploy() {
+		if (dialog) dialog.remove();
+		dialog = document.createElement("div");
+		dialog.className = "lcw-modal";
+		dialog.setAttribute("data-livecrafts", "deploy");
+		dialog.innerHTML =
+			'<div class="lcw-modal-card" role="dialog" aria-modal="true" aria-labelledby="lcw-dep-title">' +
+			'<h2 id="lcw-dep-title">Deploy to the live site</h2>' +
+			'<div class="lcw-dep-list" aria-live="polite">Checking the drafts…</div>' +
+			'<label class="lcw-field"><span>Deploy notes <small>(what and why - shown in the history)</small></span><textarea rows="2" maxlength="2000" class="lcw-dep-notes"></textarea></label>' +
+			'<label class="lcw-field"><span>' + escapeHtml(C.asksFor === "deploy password" ? "Deploy password" : "Your WordPress password") + '</span><input type="password" class="lcw-dep-pw" autocomplete="current-password" required></label>' +
+			'<label class="lcw-check" hidden><input type="checkbox" class="lcw-dep-force"> Someone changed these on the live site after the draft was made. Deploy anyway (the draft wins).</label>' +
+			'<p class="lcw-dep-error" role="alert" hidden></p>' +
+			'<div class="lcw-modal-actions"><button type="button" class="lcw-db-btn" data-act="cancel">Cancel</button><button type="button" class="lcw-db-btn lcw-db-primary" data-act="go" disabled>Deploy</button></div>' +
+			"</div>";
+		document.body.appendChild(dialog);
+		var q = function (s) { return dialog.querySelector(s); };
+		var go = q('[data-act="go"]'), err = q(".lcw-dep-error"), force = q(".lcw-check");
+		var close = function () { if (dialog) { dialog.remove(); dialog = null; } document.removeEventListener("keydown", onEsc, true); };
+		var onEsc = function (e) { if (e.key === "Escape") { e.preventDefault(); close(); } };
+		document.addEventListener("keydown", onEsc, true);
+		q('[data-act="cancel"]').addEventListener("click", close);
+		dialog.addEventListener("click", function (e) { if (e.target === dialog) close(); });
+		wp("GET", "deploy/check").then(function (c) {
+			var html = (c.items || []).map(function (i) {
+				return "<div class='lcw-dep-item'><b>" + escapeHtml(i.object) + "</b><ul>" + i.changes.map(function (s) { return "<li>" + escapeHtml(s) + "</li>"; }).join("") + "</ul></div>";
+			}).join("");
+			if ((c.errors || []).length) html += "<p class='lcw-dep-warn'>Cannot deploy: " + c.errors.map(function (x) { return escapeHtml(x.object + ": " + x.error); }).join("; ") + "</p>";
+			if ((c.conflicts || []).length) {
+				html += "<p class='lcw-dep-warn'>Changed on the live site meanwhile: " + c.conflicts.map(function (x) { return escapeHtml(x.object); }).join(", ") + "</p>";
+				force.hidden = false;
+			}
+			q(".lcw-dep-list").innerHTML = html || "Nothing to deploy.";
+			go.disabled = !(c.items || []).length || (c.errors || []).length > 0;
+			q(".lcw-dep-pw").focus();
+		}, function (e) { q(".lcw-dep-list").textContent = "Could not check the drafts: " + e.message; });
+		go.addEventListener("click", function () {
+			var pw = q(".lcw-dep-pw").value;
+			if (!pw) { err.hidden = false; err.textContent = "Type the password."; return; }
+			go.disabled = true; go.textContent = "Deploying…"; err.hidden = true;
+			wp("POST", "deploy", { password: pw, notes: q(".lcw-dep-notes").value, force: !!q(".lcw-dep-force").checked }).then(function (r) {
+				if (r.failed && r.failed.length) throw new Error("Deployed with problems: " + r.failed.map(function (f) { return f.object + ": " + f.error; }).join("; "));
+				close();
+				send({ type: "lc:deployed", release: r.release });
+				state.open = !panel.hidden; save();
+				hardReload();
+			}).catch(function (e) {
+				go.disabled = false; go.textContent = "Deploy";
+				err.hidden = false; err.textContent = e.message;
+				if (e.code === "livecrafts_conflict") force.hidden = false;
+				q(".lcw-dep-pw").value = ""; q(".lcw-dep-pw").focus();
+			});
+		});
+	}
+
+	// The chat can ask for these too (its own Deploy / Discard buttons and the preview switch).
+	window.addEventListener("message", function (e) {
+		if (e.origin !== backendOrigin || !e.data || typeof e.data.type !== "string") return;
+		if (e.data.type === "lc:deploy" && C.canDeploy) openDeploy();
+		else if (e.data.type === "lc:discard") discardAll();
+		else if (e.data.type === "lc:view") setView(e.data.view);
+		else if (e.data.type === "lc:drafts-changed" || e.data.type === "lc:ready") refreshDrafts();
+	});
+	renderBar();
 
 	if (state.open) open();
 	// remove our cache-busting parameter from the address bar after a reload
