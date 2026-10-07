@@ -67,6 +67,11 @@ function livecrafts_kinds() {
 				return livecrafts_el_values_equal( $path, $a, $b );
 			},
 		),
+		// Elementor structure: add, remove, duplicate, move elements (elementor.php).
+		'el.insert'    => livecrafts_el_structure_kind( 'insert' ),
+		'el.remove'    => livecrafts_el_structure_kind( 'remove' ),
+		'el.duplicate' => livecrafts_el_structure_kind( 'duplicate' ),
+		'el.move'      => livecrafts_el_structure_kind( 'move' ),
 		'css.block' => array(
 			'object'  => 'css',
 			'prepare' => 'livecrafts_kind_css_prepare',
@@ -240,22 +245,40 @@ function livecrafts_kind_acf_prepare( $post_id, $target, $value, array $draft ) 
 	);
 }
 
+/** Any setting of an Elementor element, checked against the control Elementor defines for it. */
 function livecrafts_kind_el_prepare( $post_id, $target, $value, array $draft ) {
 	if ( ! livecrafts_el_active() ) return new WP_Error( 'livecrafts_no_elementor', 'Elementor is not active on this site.', array( 'status' => 400 ) );
-	if ( ! preg_match( '/^([A-Za-z0-9]{3,16}):([a-z_]+(?:\.[a-z_]+)?)$/', (string) $target, $m ) ) return livecrafts_bad_value( 'An Elementor target looks like <element id>:<setting>, e.g. 3f2a1c:title.' );
+	if ( ! preg_match( '/^([A-Za-z0-9]{3,16}):([a-z0-9_]{1,80}|link\.url)$/', (string) $target, $m ) ) {
+		return livecrafts_bad_value( 'An Elementor setting is "<element id>:<setting>", e.g. 3f2a1c:title or 3f2a1c:title_color.' );
+	}
 	$tree = livecrafts_el_tree( $draft );
 	if ( ! $tree ) return livecrafts_bad_value( 'This page is not built with Elementor.' );
-	$cur = livecrafts_el_read( $tree, $m[1], $m[2] );
-	if ( ! $cur['found'] ) return new WP_Error( 'livecrafts_no_element', 'That Elementor element is not on this page.', array( 'status' => 404 ) );
-	if ( $cur['value'] === null && $m[2] !== 'background_image' ) return new WP_Error( 'livecrafts_no_setting', 'This element has no "' . $m[2] . '" setting.', array( 'status' => 404 ) );
-	$clean = livecrafts_el_validate( $m[2], $value, is_string( $cur['value'] ) ? $cur['value'] : '' );
-	if ( is_wp_error( $clean ) ) return $clean;
-	$what = ucfirst( str_replace( array( '-', '_', '.' ), ' ', $cur['type'] ) ) . ' ' . str_replace( '_', ' ', $m[2] );
+	$node = livecrafts_el_node( $tree, $m[1] );
+	if ( ! $node ) return new WP_Error( 'livecrafts_no_element', 'That Elementor element is not on this page.', array( 'status' => 404 ) );
+	$name     = $m[2] === 'link.url' ? 'link' : $m[2];
+	$controls = livecrafts_el_controls( $node );
+	if ( ! $controls ) return livecrafts_bad_value( 'Elementor does not know this element type (the add-on that provides it may be inactive).' );
+	$usable = function ( $c ) { return isset( $c['type'] ) && in_array( $c['type'], livecrafts_el_control_types(), true ); };
+	if ( ! isset( $controls[ $name ] ) || ! $usable( $controls[ $name ] ) ) {
+		$names = array_keys( array_filter( $controls, $usable ) );
+		return livecrafts_bad_value( livecrafts_el_label( $node ) . ' has no setting "' . $name . '" that can be changed here. Its settings include: ' . implode( ', ', array_slice( $names, 0, 40 ) ) . '.' );
+	}
+	$settings = isset( $node['settings'] ) && is_array( $node['settings'] ) ? $node['settings'] : array();
+	$current  = livecrafts_el_get( $settings, $m[2] );
+	if ( $m[2] === 'link.url' ) {
+		$clean = esc_url_raw( (string) $value );
+		if ( $clean === '' && (string) $value !== '' ) return livecrafts_bad_value( 'Not a valid address.' );
+	} else {
+		$clean = livecrafts_el_value( $controls[ $name ], $value, isset( $settings[ $name ] ) ? $settings[ $name ] : null, $name );
+		if ( is_wp_error( $clean ) ) return $clean;
+	}
+	$what = livecrafts_el_label( $node ) . ' › ' . wp_strip_all_tags( isset( $controls[ $name ]['label'] ) && $controls[ $name ]['label'] !== '' ? $controls[ $name ]['label'] : $name );
+	if ( preg_match( '/_(tablet|mobile|widescreen|laptop|tablet_extra|mobile_extra)$/', $name, $d ) ) $what .= ' (' . str_replace( '_', ' ', $d[1] ) . ')';
 	return array(
 		'target'  => $target,
 		'after'   => $clean,
-		'payload' => array( 'widget' => $cur['type'] ),
-		'summary' => 'Elementor ' . $what . ': ' . livecrafts_quote( $cur['value'] ) . ' → ' . livecrafts_quote( $clean ),
+		'payload' => array( 'widget' => isset( $node['widgetType'] ) ? $node['widgetType'] : $node['elType'], 'control' => $controls[ $name ]['type'] ),
+		'summary' => 'Elementor ' . $what . ': ' . livecrafts_quote( $current === null ? '(default)' : $current ) . ' → ' . livecrafts_quote( $clean === '' ? '(default)' : $clean ),
 	);
 }
 

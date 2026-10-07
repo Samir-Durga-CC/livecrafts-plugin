@@ -78,6 +78,7 @@ function livecrafts_rest_map( WP_REST_Request $req ) {
 		'builders'  => array( 'elementor' => ! empty( $data['meta']['_elementor_data'] ), 'acf_fields' => count( $acf ), 'elementor_settings' => count( $el ) ),
 		'acf'       => $acf,
 		'elementor' => $el,
+		'elementor_outline' => livecrafts_el_outline( livecrafts_el_tree( $data ) ),
 		'drafts'    => count( livecrafts_draft_changes( 'post', $post ) ),
 		'note'      => 'Each entry has a stable target id (tid). Change it with POST /changes (kind acf.field target <field key>, or kind el.setting target <element id>:<setting>). Text not listed here is not in ACF/Elementor (it may be block content, a menu, a widget or the theme).',
 	);
