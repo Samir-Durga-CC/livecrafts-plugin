@@ -31,6 +31,7 @@ require_once LIVECRAFTS_DIR . 'includes/watch.php';
 require_once LIVECRAFTS_DIR . 'includes/deploy.php';
 require_once LIVECRAFTS_DIR . 'includes/notes.php';
 require_once LIVECRAFTS_DIR . 'includes/rest.php';
+require_once LIVECRAFTS_DIR . 'includes/resolve.php';
 require_once LIVECRAFTS_DIR . 'includes/audit.php';
 require_once LIVECRAFTS_DIR . 'includes/bridge.php';
 require_once LIVECRAFTS_DIR . 'includes/theme-files.php';

@@ -217,15 +217,32 @@ function livecrafts_el_read( array $tree, $id, $path ) {
 }
 
 /** Set one (already validated) setting in a tree. true or WP_Error. */
-function livecrafts_el_write_tree( array &$tree, $id, $path, $value ) {
-	$res = livecrafts_el_apply( $tree, $id, function ( &$node ) use ( $path, $value ) {
+function livecrafts_el_write_tree( array &$tree, $id, $path, $value, array $also = array() ) {
+	$res = livecrafts_el_apply( $tree, $id, function ( &$node ) use ( $path, $value, $also ) {
 		if ( ! isset( $node['settings'] ) || ! is_array( $node['settings'] ) ) $node['settings'] = array();
 		livecrafts_el_put( $node['settings'], $path, $value );
-		// A background image only shows with the classic background type.
-		if ( $path === 'background_image' && ! empty( $value ) && empty( $node['settings']['background_background'] ) ) $node['settings']['background_background'] = 'classic';
+		foreach ( $also as $name => $v ) livecrafts_el_put( $node['settings'], $name, $v );
 		return true;
 	} );
 	return $res === null ? new WP_Error( 'livecrafts_no_element', 'That Elementor element is not on this page (any more).', array( 'status' => 404 ) ) : true;
+}
+
+/**
+ * The switches Elementor turns on by itself when someone uses a control in the editor: a typography value needs
+ * its "custom typography" toggle, a background colour/image needs the "classic" background type. Only switches that
+ * exist on this element and are still off. Returns control name => value.
+ */
+function livecrafts_el_toggles( array $controls, array $settings, $name ) {
+	$also = array();
+	if ( preg_match( '/^(.*typography)_(font_size|font_weight|font_family|font_style|text_transform|text_decoration|line_height|letter_spacing|word_spacing)(_[a-z_]+)?$/', $name, $m ) ) {
+		$toggle = $m[1] . '_typography';
+		if ( isset( $controls[ $toggle ] ) && empty( $settings[ $toggle ] ) && empty( $settings['__globals__'][ $toggle ] ) ) $also[ $toggle ] = 'custom';
+	}
+	if ( preg_match( '/^(.*background)_(color|image)(_[a-z_]+)?$/', $name, $m ) ) {
+		$toggle = $m[1] . '_background';
+		if ( isset( $controls[ $toggle ] ) && empty( $settings[ $toggle ] ) ) $also[ $toggle ] = 'classic';
+	}
+	return $also;
 }
 
 function livecrafts_el_number( $v ) {

@@ -54,10 +54,10 @@ function livecrafts_kinds() {
 				$r = livecrafts_el_read( livecrafts_el_tree( $data ), $id, $path );
 				return $r['value'];
 			},
-			'apply'   => function ( &$data, $target, $after ) {
+			'apply'   => function ( &$data, $target, $after, $payload ) {
 				list( $id, $path ) = explode( ':', $target, 2 );
 				$tree = livecrafts_el_tree( $data );
-				$r    = livecrafts_el_write_tree( $tree, $id, $path, $after );
+				$r    = livecrafts_el_write_tree( $tree, $id, $path, $after, isset( $payload['also'] ) && $after !== '' ? (array) $payload['also'] : array() );
 				if ( is_wp_error( $r ) ) return $r;
 				livecrafts_el_set_tree( $data, $tree );
 				return true;
@@ -277,7 +277,7 @@ function livecrafts_kind_el_prepare( $post_id, $target, $value, array $draft ) {
 	return array(
 		'target'  => $target,
 		'after'   => $clean,
-		'payload' => array( 'widget' => isset( $node['widgetType'] ) ? $node['widgetType'] : $node['elType'], 'control' => $controls[ $name ]['type'] ),
+		'payload' => array( 'widget' => isset( $node['widgetType'] ) ? $node['widgetType'] : $node['elType'], 'control' => $controls[ $name ]['type'], 'also' => livecrafts_el_toggles( $controls, $settings, $name ) ),
 		'summary' => 'Elementor ' . $what . ': ' . livecrafts_quote( $current === null ? '(default)' : $current ) . ' → ' . livecrafts_quote( $clean === '' ? '(default)' : $clean ),
 	);
 }
