@@ -15,7 +15,6 @@ function livecrafts_assistant_defaults() {
 	return array(
 		'enabled'        => 1,
 		'backend_url'    => 'http://127.0.0.1:8790',
-		'access_token'   => '',
 		'bot_name'       => 'Livecrafts',
 		'welcome'        => 'Hi! Tell me what you would like to change on this page - text, images, colours, new sections or pages.',
 		'instructions'   => '',
@@ -38,7 +37,6 @@ function livecrafts_assistant_sanitize( $in ) {
 	$out['enabled']        = empty( $in['enabled'] ) ? 0 : 1;
 	$url                   = isset( $in['backend_url'] ) ? esc_url_raw( trim( $in['backend_url'] ), array( 'http', 'https' ) ) : '';
 	$out['backend_url']    = $url ? untrailingslashit( $url ) : $d['backend_url'];
-	$out['access_token']   = isset( $in['access_token'] ) ? sanitize_text_field( $in['access_token'] ) : '';
 	$out['bot_name']       = isset( $in['bot_name'] ) && trim( $in['bot_name'] ) !== '' ? mb_substr( sanitize_text_field( $in['bot_name'] ), 0, 60 ) : $d['bot_name'];
 	$out['welcome']        = isset( $in['welcome'] ) ? mb_substr( sanitize_textarea_field( $in['welcome'] ), 0, 500 ) : '';
 	$out['instructions']   = isset( $in['instructions'] ) ? mb_substr( sanitize_textarea_field( $in['instructions'] ), 0, 4000 ) : '';
@@ -89,8 +87,6 @@ function livecrafts_assistant_page() {
 			<table class="form-table" role="presentation">
 				<tr><th scope="row"><label for="lc-backend">Livecrafts backend address</label></th><td><input id="lc-backend" class="regular-text code" name="<?php echo esc_attr( $n ); ?>[backend_url]" value="<?php echo esc_attr( $a['backend_url'] ); ?>">
 					<p class="description">Where the Livecrafts app runs. On your own computer: <code>http://127.0.0.1:8790</code>.</p></td></tr>
-				<tr><th scope="row"><label for="lc-token">Backend access token</label></th><td><input id="lc-token" type="password" autocomplete="off" class="regular-text" name="<?php echo esc_attr( $n ); ?>[access_token]" value="<?php echo esc_attr( $a['access_token'] ); ?>">
-					<p class="description">Only if the backend has <code>LC_API_TOKEN</code> set. It is given only to logged-in editors.</p></td></tr>
 			</table>
 			<?php submit_button(); ?>
 		</form>
@@ -117,12 +113,12 @@ function livecrafts_rest_assistant() {
 add_action( 'wp_enqueue_scripts', function () {
 	$a = livecrafts_assistant();
 	if ( is_admin() || empty( $a['enabled'] ) || ! livecrafts_user_can_edit() ) return;
+	wp_enqueue_media(); // the click panel picks images from the Media Library
 	wp_enqueue_style( 'livecrafts-widget', LIVECRAFTS_URL . 'assets/widget.css', array(), LIVECRAFTS_VERSION );
 	wp_enqueue_script( 'livecrafts-widget', LIVECRAFTS_URL . 'assets/widget.js', array(), LIVECRAFTS_VERSION, true );
 	$scheme = is_ssl() ? 'https' : 'http';
 	wp_localize_script( 'livecrafts-widget', 'LIVECRAFTS_WIDGET', array(
 		'backend'      => $a['backend_url'],
-		'token'        => $a['access_token'],
 		'botName'      => $a['bot_name'],
 		'welcome'      => $a['welcome'],
 		'accent'       => $a['accent'],

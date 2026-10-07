@@ -34,10 +34,18 @@ function livecrafts_preview_active() {
 	$active = ! is_admin() && ! wp_doing_ajax() && ! wp_doing_cron()
 		&& ! ( defined( 'REST_REQUEST' ) && REST_REQUEST ) && ! ( defined( 'WP_CLI' ) && WP_CLI )
 		&& ! isset( $_GET['elementor-preview'] ) && ! is_customize_preview()
-		&& is_user_logged_in() && livecrafts_can_edit()
-		&& ! ( isset( $_COOKIE['livecrafts_view'] ) && $_COOKIE['livecrafts_view'] === 'live' );
+		&& ( livecrafts_preview_token_request()
+			|| ( is_user_logged_in() && livecrafts_can_edit() && ! ( isset( $_COOKIE['livecrafts_view'] ) && $_COOKIE['livecrafts_view'] === 'live' ) ) );
 	return $active;
 }
+
+// A page opened with a preview token: never cached, never indexed, and its address (with the token) never sent on.
+add_action( 'send_headers', function () {
+	if ( ! livecrafts_preview_token_request() ) return;
+	nocache_headers();
+	header( 'X-Robots-Tag: noindex, nofollow' );
+	header( 'Referrer-Policy: no-referrer' );
+} );
 
 /** The preview copy to use for a post in this request (0 = show live). */
 function livecrafts_preview_copy( $post_id ) {

@@ -61,12 +61,31 @@ function livecrafts_b64url_decode( $text ) {
 	return base64_decode( strtr( $text, '-_', '+/' ) );
 }
 
-/** A signed token for one user: "<payload>.<signature>", both base64url. */
+/** "<payload>.<signature>", both base64url, signed with the site secret. */
+function livecrafts_sign( array $payload ) {
+	$p = livecrafts_b64url( wp_json_encode( $payload ) );
+	return $p . '.' . livecrafts_b64url( hash_hmac( 'sha256', $p, livecrafts_secret(), true ) );
+}
+
+/** The payload of a valid, unexpired token of this kind ('widget' or 'preview') made by this site, or null. */
+function livecrafts_unsign( $token, $kind ) {
+	$parts = explode( '.', (string) $token );
+	if ( count( $parts ) !== 2 || $parts[0] === '' ) return null;
+	$expected = livecrafts_b64url( hash_hmac( 'sha256', $parts[0], livecrafts_secret(), true ) );
+	if ( ! hash_equals( $expected, $parts[1] ) ) return null;
+	$payload = json_decode( (string) livecrafts_b64url_decode( $parts[0] ), true );
+	if ( ! is_array( $payload ) || empty( $payload['uid'] ) || empty( $payload['exp'] ) || (int) $payload['exp'] < time() ) return null;
+	if ( ( isset( $payload['k'] ) ? $payload['k'] : 'widget' ) !== $kind ) return null;
+	return $payload;
+}
+
+/** A widget token for one user: who they are and what they may do, for LIVECRAFTS_TOKEN_TTL. */
 function livecrafts_widget_token( $user_id ) {
 	$user = get_userdata( $user_id );
 	if ( ! $user ) return '';
-	$payload = livecrafts_b64url( wp_json_encode( array(
+	return livecrafts_sign( array(
 		'v'      => 1,
+		'k'      => 'widget',
 		'site'   => untrailingslashit( home_url() ),
 		'uid'    => (int) $user->ID,
 		'login'  => $user->user_login,
@@ -74,19 +93,31 @@ function livecrafts_widget_token( $user_id ) {
 		'edit'   => livecrafts_can_edit( $user->ID ),
 		'deploy' => livecrafts_can_deploy( $user->ID ),
 		'exp'    => time() + LIVECRAFTS_TOKEN_TTL,
-	) ) );
-	return $payload . '.' . livecrafts_b64url( hash_hmac( 'sha256', $payload, livecrafts_secret(), true ) );
+	) );
 }
 
-/** The payload of a valid, unexpired token made by this site, or null. */
 function livecrafts_verify_token( $token ) {
-	$parts = explode( '.', (string) $token );
-	if ( count( $parts ) !== 2 || $parts[0] === '' ) return null;
-	$expected = livecrafts_b64url( hash_hmac( 'sha256', $parts[0], livecrafts_secret(), true ) );
-	if ( ! hash_equals( $expected, $parts[1] ) ) return null;
-	$payload = json_decode( (string) livecrafts_b64url_decode( $parts[0] ), true );
-	if ( ! is_array( $payload ) || empty( $payload['uid'] ) || empty( $payload['exp'] ) || (int) $payload['exp'] < time() ) return null;
-	return $payload;
+	return livecrafts_unsign( $token, 'widget' );
+}
+
+/**
+ * A preview token: lets ONE request (?lc_preview=<token>) see the site with its drafts, without logging anyone in.
+ * View only, 10 minutes. Used by the Livecrafts backend to check its own changes in a real browser exactly as editors
+ * will see them. Pages opened with it are never cached or indexed and send no referrer.
+ */
+function livecrafts_preview_token( $user_id ) {
+	return livecrafts_sign( array( 'v' => 1, 'k' => 'preview', 'uid' => (int) $user_id, 'exp' => time() + 10 * MINUTE_IN_SECONDS ) );
+}
+
+/** Is this request a preview opened with a valid preview token? */
+function livecrafts_preview_token_request() {
+	static $ok = null;
+	if ( $ok === null ) {
+		$token = isset( $_GET['lc_preview'] ) ? sanitize_text_field( wp_unslash( $_GET['lc_preview'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification -- signed token
+		$p     = $token !== '' ? livecrafts_unsign( $token, 'preview' ) : null;
+		$ok    = $p && livecrafts_can_edit( (int) $p['uid'] );
+	}
+	return $ok;
 }
 
 /**

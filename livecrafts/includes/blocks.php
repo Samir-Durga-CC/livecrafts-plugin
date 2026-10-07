@@ -5,8 +5,8 @@
  *
  * A block is addressed by its PATH: positions among the real blocks (whitespace between blocks does not count),
  * from the top, joined by dots. "2" = the third top-level block, "2.0" = the first block inside it.
- * For logged-in editors, every rendered block of the page content carries data-lc-block="<post id>:<path>", so a click
- * on the page finds its block exactly. Visitors never get this attribute.
+ * For logged-in editors (and previews opened with a preview token), every rendered block of the page content carries
+ * data-lc-block="<post id>:<path>", so a click on the page finds its block exactly. Visitors never get this attribute.
  *
  * Changes to block content are checked as a whole against the live content when deploying: if the live content
  * changed after the first draft block change, that is a conflict the person must confirm.
@@ -299,7 +299,7 @@ function livecrafts_block_set_image( array $b, $id ) {
 
 // For logged-in editors: tag the blocks of the page's own content with their path, before WordPress renders them.
 add_filter( 'the_content', function ( $content ) {
-	if ( ! livecrafts_user_can_edit() || ! has_blocks( $content ) || ! in_the_loop() || ! is_main_query() ) return $content;
+	if ( ! ( livecrafts_user_can_edit() || livecrafts_preview_token_request() ) || ! has_blocks( $content ) || ! in_the_loop() || ! is_main_query() ) return $content;
 	$post_id = (int) get_the_ID();
 	if ( ! $post_id || $post_id !== (int) get_queried_object_id() ) return $content;
 	$mark = function ( array $blocks, $prefix ) use ( &$mark, $post_id ) {

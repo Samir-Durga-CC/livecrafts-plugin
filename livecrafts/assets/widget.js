@@ -62,7 +62,7 @@
 	function frameUrl() {
 		var cfg = {
 			siteUrl: C.siteUrl, pageUrl: location.href.split("#")[0], botName: C.botName, welcome: C.welcome, accent: C.accent,
-			approvalMode: C.approvalMode, token: C.token || "", user: C.user || "", parentOrigin: location.origin, tab: state.tab || "chat",
+			approvalMode: C.approvalMode, user: C.user || "", parentOrigin: location.origin, tab: state.tab || "chat",
 			widgetVersion: C.version || "0.9.0", pageKey: C.pageKey || "", postId: C.postId || 0,
 			// who the person is, signed by this site (the backend credits every change to them)
 			widgetToken: C.widgetToken || "", view: C.view || "draft", drafts: Number(C.drafts) || 0, canDeploy: !!C.canDeploy,
@@ -155,6 +155,24 @@
 		el.classList.add("lcw-selected");
 		setTimeout(function () { el.classList.remove("lcw-selected"); }, 1600);
 		send({ type: "lc:selected", element: snap });
+		// What is it, and what can be done to it? WordPress answers from the element's real source - no AI involved.
+		resolve(snap).then(function (r) { send({ type: "lc:resolved", selector: snap.selector, resolved: r }); },
+			function (e) { send({ type: "lc:resolved", selector: snap.selector, error: e.message }); });
+	}
+	function resolve(snap) {
+		return wp("POST", "resolve", {
+			page: Number(C.postId) || 0, device: deviceOf(window.innerWidth), elementor: snap.elementor ? { doc: snap.elementor.post, id: snap.elementor.id } : null,
+			block: snap.block || "", menuItem: snap.menuItem || 0, tag: snap.tag, text: snap.rawText || snap.text,
+			imageSrc: snap.image ? snap.image.src : "", bgImage: snap.bgImage || "", href: snap.link || "", selector: snap.selector,
+		});
+	}
+	/** The block of the page content this element belongs to ("<post>:<path>", only on pages Livecrafts marked for editors). */
+	function blockOf(el) { var b = el.closest && el.closest("[data-lc-block]"); return b ? b.getAttribute("data-lc-block") : ""; }
+	/** The classic menu link this element belongs to (WordPress puts menu-item-<id> on each item). */
+	function menuItemOf(el) {
+		var li = el.closest && el.closest("li[class*='menu-item-']");
+		var m = li && /(?:^|\s)menu-item-(\d+)(?:\s|$)/.exec(li.className);
+		return m ? Number(m[1]) : 0;
 	}
 
 	function describe(el) {
@@ -187,7 +205,7 @@
 			link: el.closest && el.closest("a") ? el.closest("a").href : "",
 			styles: styles, rect: { width: Math.round(r.width), height: Math.round(r.height) },
 			section: sectionOf(el), pageUrl: location.href.split("#")[0].replace(/[?&]lcv=\d+/, ""), viewport: window.innerWidth,
-			pageKey: C.pageKey || "", elementor: elementorOf(el), hasChildren: hasMarkup(el),
+			pageKey: C.pageKey || "", elementor: elementorOf(el), hasChildren: hasMarkup(el), block: blockOf(el), menuItem: menuItemOf(el),
 			similarSelector: similar.selector, similarCount: similar.count,
 		};
 	}
@@ -618,7 +636,42 @@
 		else if (e.data.type === "lc:discard") discardAll();
 		else if (e.data.type === "lc:view") setView(e.data.view);
 		else if (e.data.type === "lc:drafts-changed" || e.data.type === "lc:ready") refreshDrafts();
+		else if (e.data.type === "lc:wp" && e.data.id) wpForChat(e.data);
+		else if (e.data.type === "lc:media" && e.data.id) pickMedia(e.data.id);
 	});
+
+	// The chat panel's own edits (click panel, Changes tab) go to WordPress from here, as the logged-in person, with
+	// their nonce - never through the backend. Only these Livecrafts routes; deploying stays in the dialog above.
+	var CHAT_ROUTES = [
+		[/^GET$/, /^(status|changes|changes\/\d+|post|map|notes|releases)(\?.*)?$/],
+		[/^POST$/, /^(changes|changes\/\d+\/revert|resolve|pages|notes|drafts\/discard)$/],
+	];
+	function wpForChat(d) {
+		var method = String(d.method || "GET").toUpperCase(), path = String(d.path || "");
+		var allowed = CHAT_ROUTES.some(function (r) { return r[0].test(method) && r[1].test(path); });
+		var reply = function (ok, data, error) { send({ type: "lc:wp-result", id: d.id, ok: ok, data: data, error: error }); };
+		if (!allowed) return reply(false, null, "Not allowed from the chat.");
+		var body = d.body && typeof d.body === "object" ? d.body : undefined;
+		if (body && method === "POST" && /^(changes|pages)$/.test(path)) body.source = "widget";
+		wp(method, path, body).then(function (j) {
+			reply(true, j);
+			if (method === "POST" && path !== "resolve") refreshDrafts();
+		}, function (e) { reply(false, e.data || null, e.message); });
+	}
+
+	// The WordPress Media Library (upload or choose), for "Replace image" in the click panel.
+	function pickMedia(id) {
+		if (!window.wp || !window.wp.media) { send({ type: "lc:media-result", id: id, ok: false, error: "The Media Library is not available on this page." }); return; }
+		var frame = window.wp.media({ title: "Choose an image", library: { type: "image" }, multiple: false, button: { text: "Use this image" } });
+		var picked = false;
+		frame.on("select", function () {
+			picked = true;
+			var a = frame.state().get("selection").first().toJSON();
+			send({ type: "lc:media-result", id: id, ok: true, attachment: { id: a.id, url: a.url, alt: a.alt || "", width: a.width, height: a.height, title: a.title } });
+		});
+		frame.on("close", function () { setTimeout(function () { if (!picked) send({ type: "lc:media-result", id: id, ok: false, cancelled: true }); }, 0); });
+		frame.open();
+	}
 	renderBar();
 
 	if (state.open) open();

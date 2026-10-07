@@ -19,6 +19,7 @@
  *   POST releases/baseline          livecrafts_deploy {notes}
  *   GET  notes  / POST notes        notes of the site and of a page (?post=) {post?, text}
  *   GET  widget-token               a fresh signed token for the logged-in person (cookie auth)
+ *   POST preview-token              a 10-minute view-only token: <page url>?lc_preview=<token> shows the drafts
  *   POST connect                    manage_options: the site secret for the Livecrafts backend {rotate?}
  *   GET  debug/target               one ACF/Elementor target: draft value, live value, recent changes
  */
@@ -54,6 +55,7 @@ add_action( 'rest_api_init', function () {
 	$route( '/notes', 'GET', 'livecrafts_rest_notes_get' );
 	$route( '/notes', 'POST', 'livecrafts_rest_notes_set' );
 	$route( '/widget-token', 'GET', 'livecrafts_rest_widget_token' );
+	$route( '/preview-token', 'POST', 'livecrafts_rest_preview_token' );
 	$route( '/connect', 'POST', 'livecrafts_rest_connect', function () { return current_user_can( 'manage_options' ); } );
 	$route( '/debug/target', 'GET', 'livecrafts_rest_debug_target' );
 } );
@@ -225,6 +227,10 @@ function livecrafts_rest_notes_set( WP_REST_Request $req ) {
 
 function livecrafts_rest_widget_token() {
 	return array( 'ok' => true, 'token' => livecrafts_widget_token( get_current_user_id() ), 'expires_in' => LIVECRAFTS_TOKEN_TTL );
+}
+
+function livecrafts_rest_preview_token() {
+	return array( 'ok' => true, 'token' => livecrafts_preview_token( get_current_user_id() ), 'param' => 'lc_preview', 'expires_in' => 10 * MINUTE_IN_SECONDS );
 }
 
 function livecrafts_rest_connect( WP_REST_Request $req ) {
