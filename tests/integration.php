@@ -182,6 +182,39 @@ check( 'Additional CSS back to the baseline', strpos( wp_get_custom_css(), 'live
 list( , $d ) = api( 'GET', 'changes', array( 'post' => $page, 'limit' => 50 ) );
 check( 'history of the page is complete', count( $d['changes'] ) >= 5, count( $d['changes'] ) );
 
+// ------------------------------------------------------------------ Phase 2: blocks, style rules, settings, click resolver
+list( $s, $d ) = api( 'POST', 'changes', array( 'kind' => 'block.text', 'post' => $page, 'target' => '0', 'value' => 'Block <strong>text</strong> ' . $stamp ) );
+check( 'block.text draft', $s === 200 && ! empty( $d['change']['id'] ), $d );
+list( $s, $d ) = api( 'POST', 'changes', array( 'kind' => 'block.insert', 'post' => $page, 'target' => ':end', 'value' => "<!-- wp:heading -->\n<h2 class=\"wp-block-heading\">Added heading</h2>\n<!-- /wp:heading -->" ) );
+check( 'block.insert draft', $s === 200 && ! empty( $d['change']['id'] ), $d );
+list( $s, $d ) = api( 'POST', 'changes', array( 'kind' => 'block.insert', 'post' => $page, 'target' => ':0', 'value' => '<p>loose html</p>' ) );
+check( 'loose HTML refused for blocks', $s === 400, array( $s, $d ) );
+$as_editor = render( $url, $admin );
+check( 'editor preview shows block changes', strpos( $as_editor, 'Block <strong>text</strong> ' . $stamp ) !== false && strpos( $as_editor, 'Added heading' ) !== false );
+check( 'editor page carries data-lc-block markers', strpos( $as_editor, 'data-lc-block="' . $page . ':0"' ) !== false );
+check( 'visitors get no markers and no drafts', strpos( render( $url, 0 ), 'data-lc-block' ) === false );
+
+list( $s, $d ) = api( 'POST', 'resolve', array( 'page' => $page, 'block' => $page . ':0', 'device' => 'desktop' ) );
+$ids = wp_list_pluck( $d['actions'] ?? array(), 'id' );
+check( 'resolve: a paragraph block can be edited, styled, moved', $s === 200 && ( $d['source']['kind'] ?? '' ) === 'block' && in_array( 'block:text', $ids, true ) && in_array( 'css:color', $ids, true ) && in_array( 'block:down', $ids, true ) && ! in_array( 'block:up', $ids, true ), $d );
+$color = array_values( array_filter( $d['actions'], function ( $a ) { return $a['id'] === 'css:color'; } ) )[0];
+list( $s1 ) = api( 'POST', 'changes', $color['requires'] );
+$value = $color['change']['value'];
+$value['declarations']['color'] = '#0b3d91';
+list( $s2, $d2 ) = api( 'POST', 'changes', array( 'kind' => 'css.rule', 'value' => $value, 'label' => 'Test paragraph' ) );
+check( 'resolver action applied without AI (class, then style rule)', $s1 === 200 && $s2 === 200 && ! empty( $d2['change']['id'] ), $d2 );
+list( $s, $d ) = api( 'POST', 'resolve', array( 'page' => $page, 'selector' => '.site-footer a', 'tag' => 'a', 'device' => 'mobile' ) );
+check( 'resolve: theme element gets style actions for mobile only', $s === 200 && ( $d['source']['kind'] ?? '' ) === 'theme' && ( $d['actions'][1]['change']['value']['media'] ?? '' ) === 'mobile', $d );
+list( $s, $d ) = api( 'POST', 'changes', array( 'kind' => 'post.meta', 'post' => $page, 'target' => '_wp_page_template', 'value' => 'no-such-template.php' ) );
+check( 'unknown page template refused', $s === 400, array( $s, $d ) );
+
+list( $s, $d ) = api( 'POST', 'deploy', array( 'password' => 'test-deploy-' . $stamp, 'notes' => 'Phase 2 deploy' ) );
+clean_post_cache( $page );
+$live_content = get_post_field( 'post_content', $page );
+check( 'Phase 2 deploy', $s === 200 && ! empty( $d['ok'] ), $d );
+check( 'live content has the block changes and the class', strpos( $live_content, 'Block <strong>text</strong> ' . $stamp ) !== false && strpos( $live_content, 'Added heading' ) !== false && preg_match( '/"className":"lc-[a-z0-9]+"/', $live_content ), $live_content );
+check( 'live Additional CSS has the style rule', strpos( wp_get_custom_css(), 'color: #0b3d91;' ) !== false );
+
 // ------------------------------------------------------------------ notes + widget token
 list( $s, $d ) = api( 'POST', 'notes', array( 'post' => $page, 'text' => 'Hero title is the ACF field lc_test_hero.' ) );
 check( 'page notes saved', $s === 200 && $d['notes']['text'] === 'Hero title is the ACF field lc_test_hero.', $d );
