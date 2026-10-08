@@ -146,12 +146,13 @@ add_action( 'elementor/css-file/post/enqueue', function ( $css_file ) {
 	if ( $css_file instanceof \Elementor\Core\Files\CSS\Post_Preview || ! method_exists( $css_file, 'get_post_id' ) ) return;
 	$copy = livecrafts_preview_copy( (int) $css_file->get_post_id() );
 	if ( ! $copy ) return;
-	wp_dequeue_style( $css_file->get_file_handle_id() );
+	$handle = 'elementor-post-' . (int) $css_file->get_post_id(); // get_file_handle_id() is protected in current Elementor versions
+	wp_dequeue_style( $handle );
 	try {
 		\Elementor\Core\Files\CSS\Post_Preview::create( $copy )->enqueue();
 	} catch ( \Throwable $e ) {
 		// The live CSS stays dequeued only if the preview CSS worked.
-		wp_enqueue_style( $css_file->get_file_handle_id() );
+		wp_enqueue_style( $handle );
 	}
 } );
 
