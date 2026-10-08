@@ -379,9 +379,8 @@
 	}
 	function withDoc(args, fn) {
 		var device = args.device || deviceOf(window.innerWidth);
-		if (samePath(args.url) && device === deviceOf(window.innerWidth)) {
-			try { return Promise.resolve(fn(document, window, device)); } catch (e) { return Promise.reject(e); }
-		}
+		// Always look at a FRESH copy of the page (a hidden frame, cache-busted): the tab the person has open was loaded before the
+		// assistant's changes and would show the old look.
 		var u;
 		try { u = new URL(args.url || location.href, location.href); } catch (e) { return Promise.reject(new Error("That is not a valid page address.")); }
 		if (u.origin !== location.origin) return Promise.reject(new Error("Only pages of this site can be opened."));
