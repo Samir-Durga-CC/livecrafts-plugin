@@ -598,9 +598,18 @@
 		}).catch(function () { /* keep the last known count */ });
 	}
 	function discardAll() {
-		if (!window.confirm("Discard all " + drafts.count + " unpublished change" + (drafts.count === 1 ? "" : "s") + "?\n\nThe live site is not touched. New pages that were never deployed go to the Trash.")) return;
-		wp("POST", "drafts/discard", {}).then(function () { state.open = !panel.hidden; save(); hardReload(); },
-			function (e) { window.alert("Could not discard: " + e.message); });
+		// Ask the site first: theme-file edits are live at once, so Discard also puts those files back.
+		refreshDrafts().then(function (s) {
+			var files = s && Number(s.files) || 0;
+			var msg = "Discard all " + drafts.count + " unpublished change" + (drafts.count === 1 ? "" : "s") + "?\n\n" +
+				(files ? files + " of them " + (files === 1 ? "is a theme-file edit" : "are theme-file edits") + " that is already live: " + (files === 1 ? "that file is" : "those files are") + " put back as it was. " : "The live site is not touched. ") +
+				"New pages that were never deployed go to the Trash.";
+			if (!window.confirm(msg)) return;
+			wp("POST", "drafts/discard", {}).then(function (r) {
+				if (r && r.file_errors && r.file_errors.length) window.alert(r.note);
+				state.open = !panel.hidden; save(); hardReload();
+			}, function (e) { window.alert("Could not discard: " + e.message); });
+		});
 	}
 
 	// The deploy dialog: what will go live, conflicts, notes, password.

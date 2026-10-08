@@ -9,7 +9,7 @@
  *   GET  changes/<id>               one change with its full before/after
  *   POST changes                    make a draft change {kind, post, target, value, label?, ref?, source?}
  *   POST changes/<id>/revert        drop a draft change / put a live change's old value back as a draft
- *   POST drafts/discard             drop every draft (or ?post=) - the live site is not touched
+ *   POST drafts/discard             drop every draft (or ?post=); without ?post= also puts back theme files edited since the last release
  *   POST pages                      new page/post as a draft {title, content?, type?, slug?, parent?, template?}
  *   GET  post                       title/content/excerpt/status of a page as editors see it (?id=&view=draft|live)
  *   GET  deploy/check               what a deploy would do, conflicts included (nothing is written)
@@ -80,6 +80,10 @@ function livecrafts_rest_status() {
 		if ( $p['type'] === 'post' ) { $o['url'] = get_permalink( $p['id'] ); $o['preview'] = get_preview_post_link( $p['id'] ); }
 		$drafts[] = array( 'object' => $o, 'changes' => array_map( 'livecrafts_change_public', $p['changes'] ) );
 	}
+	$files = livecrafts_files_pending(); // theme files: live at once, not yet accepted by a release
+	if ( $files ) {
+		$drafts[] = array( 'object' => array( 'type' => 'file', 'id' => 0, 'label' => 'Theme files (already live)' ), 'changes' => array_map( 'livecrafts_change_public', array_reverse( $files ) ) );
+	}
 	$releases = livecrafts_releases( 1 );
 	$last     = $releases ? $releases[0] : null;
 	$since    = $last ? livecrafts_change_id_at( gmdate( 'Y-m-d H:i:s', strtotime( $last['at'] ) ) ) : 0;
@@ -87,6 +91,7 @@ function livecrafts_rest_status() {
 	return array(
 		'ok'        => true,
 		'drafts'    => array( 'count' => (int) array_sum( array_map( function ( $d ) { return count( $d['changes'] ); }, $drafts ) ), 'objects' => $drafts ),
+		'files'     => count( $files ),
 		'conflicts' => $check['conflicts'],
 		'broken'    => $check['errors'],
 		'last_release'                  => $last,
@@ -157,8 +162,14 @@ function livecrafts_rest_discard( WP_REST_Request $req ) {
 	$post   = (int) $req->get_param( 'post' );
 	$object = $post ? array( 'post', $post ) : ( $req->get_param( 'css' ) ? array( 'css', 0 ) : null );
 	if ( $post && ! current_user_can( 'edit_post', $post ) ) return new WP_Error( 'livecrafts_forbidden', 'You cannot edit this page.', array( 'status' => 403 ) );
-	$n = livecrafts_discard_drafts( $object, livecrafts_actor( $req ), 'discard' );
-	return array( 'ok' => true, 'discarded' => $n, 'note' => $n ? 'The drafts were dropped. The live site was not changed.' : 'There were no drafts.' );
+	$report = array();
+	$n      = livecrafts_discard_drafts( $object, livecrafts_actor( $req ), 'discard', $report );
+	$files  = isset( $report['files'] ) ? (int) $report['files'] : 0;
+	$errors = isset( $report['file_errors'] ) ? $report['file_errors'] : array();
+	$note   = $n ? 'The drafts were dropped. The live site was not changed by that.' : ( $files || $errors ? '' : 'There were no drafts.' );
+	if ( $files ) $note = trim( $note . ' ' . $files . ' theme file' . ( $files === 1 ? '' : 's' ) . ' put back as before (they were live at once).' );
+	if ( $errors ) $note = trim( $note . ' ' . count( $errors ) . ' theme file(s) could not be put back: ' . implode( '; ', wp_list_pluck( $errors, 'error' ) ) );
+	return array( 'ok' => ! $errors, 'discarded' => $n, 'files_restored' => $files, 'file_errors' => $errors, 'note' => $note );
 }
 
 function livecrafts_rest_page_create( WP_REST_Request $req ) {
@@ -185,6 +196,8 @@ function livecrafts_rest_deploy_check() {
 	$check = livecrafts_deploy_check();
 	$items = array();
 	foreach ( $check['plan'] as $p ) $items[] = array( 'object' => $p['label'], 'changes' => wp_list_pluck( $p['changes'], 'summary' ) );
+	$files = livecrafts_files_pending();
+	if ( $files ) $items[] = array( 'object' => 'Theme files (already live)', 'changes' => wp_list_pluck( array_reverse( $files ), 'summary' ) );
 	return array( 'ok' => ! $check['errors'], 'items' => $items, 'conflicts' => $check['conflicts'], 'errors' => $check['errors'],
 		'asks_for' => livecrafts_has_deploy_password() ? 'deploy password' : 'your WordPress password' );
 }

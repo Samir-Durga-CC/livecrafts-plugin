@@ -12,8 +12,11 @@
  *   3. read it back; if it is not what was meant, the object is put back exactly as it was and reported as failed
  *   4. snapshot before/after (for resets) and mark the changes live
  *
- * Reset to a release: every object changed after that release is put back to its state at that release; pages first
- * published after it go to the Trash. A reset is itself a release, so it can be undone by resetting to the release
+ * Theme-file edits (file-changes.php) are live the moment they are written, so a deploy has nothing to write for them: it
+ * only accepts them into the release (after that, Discard all no longer undoes them).
+ *
+ * Reset to a release: every object changed after that release is put back to its state at that release; theme files
+ * edited after it are restored; pages first published after it go to the Trash. A reset is itself a release, so it can be undone by resetting to the release
  * before it.
  */
 
@@ -91,7 +94,9 @@ function livecrafts_deploy_check( $ids = null ) {
 function livecrafts_deploy( $user_id, $notes, array $opts = array() ) {
 	$ids   = ! empty( $opts['ids'] ) ? array_map( 'intval', (array) $opts['ids'] ) : null;
 	$check = livecrafts_deploy_check( $ids );
-	if ( ! $check['plan'] ) return new WP_Error( 'livecrafts_nothing', 'There are no draft changes to deploy.', array( 'status' => 400 ) );
+	$files = livecrafts_files_pending();
+	if ( $ids ) $files = array_values( array_filter( $files, function ( $c ) use ( $ids ) { return in_array( $c['id'], $ids, true ); } ) );
+	if ( ! $check['plan'] && ! $files ) return new WP_Error( 'livecrafts_nothing', 'There are no draft changes to deploy.', array( 'status' => 400 ) );
 	if ( $check['errors'] ) {
 		return new WP_Error( 'livecrafts_cannot_deploy', 'Some draft changes cannot be applied any more. Revert them first.', array( 'status' => 409, 'errors' => $check['errors'] ) );
 	}
@@ -106,6 +111,10 @@ function livecrafts_deploy( $user_id, $notes, array $opts = array() ) {
 		$r = livecrafts_commit( $p, $release );
 		if ( is_wp_error( $r ) ) $failed[] = array( 'object' => $p['label'], 'error' => $r->get_error_message() );
 		else $done[] = array( 'object' => $p['label'], 'changes' => count( $p['changes'] ), 'url' => $p['type'] === 'post' ? get_permalink( $p['id'] ) : null );
+	}
+	if ( $files ) {
+		foreach ( $files as $f ) livecrafts_change_update( $f['id'], array( 'release_id' => $release ) );
+		$done[] = array( 'object' => 'Theme files (already live)', 'changes' => count( $files ), 'url' => null );
 	}
 	$count   = array_sum( wp_list_pluck( $done, 'changes' ) );
 	$summary = sprintf( '%d change%s on %d item%s', $count, $count === 1 ? '' : 's', count( $done ), count( $done ) === 1 ? '' : 's' ) . ( $failed ? sprintf( ', %d failed', count( $failed ) ) : '' );
@@ -258,6 +267,13 @@ function livecrafts_reset_to( $release_id, $user_id, $notes, $source = 'widget' 
 		$r = livecrafts_reset_object( 'post', $id, $live, $state, $release, $user_id, $source, $label . ' (published after it: back to draft)' );
 		if ( is_wp_error( $r ) ) $failed[] = array( 'object' => livecrafts_object_label( 'post', $id ), 'error' => $r->get_error_message() );
 		else $restored[] = livecrafts_object_label( 'post', $id ) . ' → draft';
+	}
+
+	// Theme files edited after that release go back too (newest first; one that was edited again by someone else is reported).
+	foreach ( livecrafts_files_released_after( $target['id'] ) as $c ) {
+		$r = livecrafts_file_revert( $c, array( 'bulk' => true, 'actor' => $user_id, 'source' => $source, 'release_id' => $release, 'ref' => 'reset' ) );
+		if ( is_wp_error( $r ) ) $failed[] = array( 'object' => 'Theme file ' . $c['target'], 'error' => $r->get_error_message() );
+		else $restored[] = 'Theme file ' . $c['target'];
 	}
 
 	$summary = $label . ': ' . count( $restored ) . ' item' . ( count( $restored ) === 1 ? '' : 's' ) . ( $failed ? ', ' . count( $failed ) . ' failed' : '' );

@@ -11,7 +11,9 @@
  *  - Needs the "edit_themes" capability (an administrator; it is removed when DISALLOW_FILE_EDIT is set).
  *  - PHP is syntax-checked BEFORE it is written (a file with a parse error is refused, nothing is written).
  *  - expectedSha1 must match the current file, so a change made meanwhile is never overwritten blindly.
- * The backend keeps a backup of every edit and restores it automatically if the site stops loading.
+ * Every write and delete is recorded in the change ledger (file-changes.php) with the full before/after content, so it
+ * shows in the site history next to every other change and can be reverted - or discarded - from anywhere.
+ * The backend restores a file automatically if the site stops loading (it passes rollback_of, and the change leaves the history).
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -119,6 +121,7 @@ function livecrafts_rest_theme_file_write( WP_REST_Request $req ) {
 	if ( is_wp_error( $abs ) ) return $abs;
 
 	$expected = (string) $req->get_param( 'expectedSha1' );
+	$current  = null;
 	if ( $exists ) {
 		$current = file_get_contents( $abs );
 		if ( $expected !== '' && sha1( $current ) !== $expected ) {
@@ -135,14 +138,31 @@ function livecrafts_rest_theme_file_write( WP_REST_Request $req ) {
 	if ( ( $exists && ! is_writable( $abs ) ) || ( ! $exists && ! is_writable( dirname( $abs ) ) ) ) {
 		return new WP_Error( 'livecrafts_not_writable', 'The server does not allow writing this file (file permissions).', array( 'status' => 500 ) );
 	}
+	if ( ! livecrafts_file_storable( $current, $content ) ) {
+		return new WP_Error( 'livecrafts_not_utf8', 'The file is not valid UTF-8 text, so the change could not be recorded for undo - nothing was written.', array( 'status' => 400 ) );
+	}
 	if ( file_put_contents( $abs, $content, LOCK_EX ) === false ) {
 		return new WP_Error( 'livecrafts_write_failed', 'Could not write the file.', array( 'status' => 500 ) );
 	}
 	clearstatcache( true, $abs );
 	if ( function_exists( 'opcache_invalidate' ) ) @opcache_invalidate( $abs, true ); // otherwise PHP may keep running the old version for a while
 
-	$after = file_get_contents( $abs );
-	return array( 'ok' => true, 'path' => livecrafts_rel_path( $abs ), 'created' => ! $exists, 'sha1' => sha1( $after ), 'bytes' => strlen( $after ), 'verified' => $after === $content );
+	$after  = file_get_contents( $abs );
+	$change = livecrafts_file_ledger( $req, livecrafts_rel_path( $abs ), $current, $after );
+	return array( 'ok' => true, 'path' => livecrafts_rel_path( $abs ), 'created' => ! $exists, 'sha1' => sha1( $after ), 'bytes' => strlen( $after ), 'verified' => $after === $content, 'change' => $change );
+}
+
+/**
+ * Record a write/delete in the ledger. rollback_of = the backend undid its own change at once because the page broke:
+ * that change leaves the history instead of adding a second entry.
+ */
+function livecrafts_file_ledger( WP_REST_Request $req, $rel, $before, $after ) {
+	$rollback = (int) $req->get_param( 'rollback_of' );
+	if ( $rollback ) {
+		livecrafts_file_drop( $rollback, livecrafts_actor( $req ), 'rolled back automatically: the page broke' );
+		return null;
+	}
+	return livecrafts_file_record( $rel, $before, $after, livecrafts_rest_change_opts( $req ) );
 }
 
 /** Remove a file the backend CREATED (used to revert "new file"). Only when its content is still exactly what was written. */
@@ -153,7 +173,11 @@ function livecrafts_rest_theme_file_delete( WP_REST_Request $req ) {
 	if ( $expected === '' || sha1( file_get_contents( $abs ) ) !== $expected ) {
 		return new WP_Error( 'livecrafts_changed', 'The file was changed after it was created, so it is not deleted automatically.', array( 'status' => 409 ) );
 	}
+	$content = file_get_contents( $abs );
+	if ( ! livecrafts_file_storable( $content, null ) ) {
+		return new WP_Error( 'livecrafts_not_utf8', 'The file is not valid UTF-8 text, so the delete could not be recorded for undo - nothing was deleted.', array( 'status' => 400 ) );
+	}
 	if ( ! @unlink( $abs ) ) return new WP_Error( 'livecrafts_delete_failed', 'Could not delete the file.', array( 'status' => 500 ) );
 	if ( function_exists( 'opcache_invalidate' ) ) @opcache_invalidate( $abs, true );
-	return array( 'ok' => true, 'deleted' => livecrafts_rel_path( $abs ) );
+	return array( 'ok' => true, 'deleted' => livecrafts_rel_path( $abs ), 'change' => livecrafts_file_ledger( $req, livecrafts_rel_path( $abs ), $content, null ) );
 }

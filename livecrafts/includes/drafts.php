@@ -259,9 +259,11 @@ function livecrafts_page_create( array $a, array $opts = array() ) {
 
 /**
  * Drop draft changes (one object, or all). New pages that were never deployed go to the Trash.
- * Nothing on the live site changes. Returns the number of dropped changes.
+ * Dropping drafts does not touch the live site - but "all" also puts back the theme files changed since the last release
+ * (they are live at once, file-changes.php); $report then says how many and which could not be restored.
+ * Returns the number of dropped draft changes.
  */
-function livecrafts_discard_drafts( $object = null, $user_id = 0, $why = '' ) {
+function livecrafts_discard_drafts( $object = null, $user_id = 0, $why = '', &$report = null ) {
 	$args = array( 'status' => 'draft', 'oldest_first' => true, 'limit' => 500 );
 	if ( $object ) { $args['object_type'] = $object[0]; $args['object_id'] = $object[1]; }
 	$touched = array();
@@ -282,6 +284,8 @@ function livecrafts_discard_drafts( $object = null, $user_id = 0, $why = '' ) {
 		}
 	} while ( count( $batch ) === 500 );
 	foreach ( $touched as $o ) livecrafts_draft_refresh( $o[0], $o[1] );
+	$report = array( 'files' => 0, 'file_errors' => array() );
+	if ( ! $object ) livecrafts_files_discard( $user_id, $report );
 	return $count;
 }
 
@@ -296,6 +300,10 @@ function livecrafts_change_revert( $id, array $opts = array() ) {
 	$actor = isset( $opts['actor'] ) ? (int) $opts['actor'] : get_current_user_id();
 
 	if ( $c['status'] === 'discarded' ) return new WP_Error( 'livecrafts_already', 'This change was already dropped.', array( 'status' => 409 ) );
+	if ( $c['kind'] === LIVECRAFTS_FILE_KIND ) { // a theme file is live at once: the old content goes back at once
+		if ( $c['reverts'] ) return new WP_Error( 'livecrafts_no_revert', 'This change already is a revert. Revert the change it undid again instead.', array( 'status' => 409 ) );
+		return livecrafts_file_revert( $c, $opts + array( 'actor' => $actor ) );
+	}
 	if ( $c['status'] === 'draft' ) {
 		$ok = livecrafts_check_object( $c['object_type'], $c['object_id'], $actor );
 		if ( is_wp_error( $ok ) ) return $ok;

@@ -4,7 +4,7 @@
  * It is what "status" and "history" show, what the assistant reads to know what happened, and what Revert works from.
  *
  *   status  draft      saved, seen only by editors (preview); not on the live site yet
- *           live       on the live site (deployed, made outside Livecrafts, or a reset)
+ *           live       on the live site (deployed, made outside Livecrafts, a reset, or a theme-file edit - those are live at once)
  *           discarded  dropped from the draft before it was deployed
  *   kind    how the change is applied - see kinds.php (post.field, acf.field, el.setting, css.block, post.create, post.restore ...)
  *           external.edit = made outside Livecrafts (recorded with before/after snapshots), restore = part of a reset
@@ -93,15 +93,19 @@ function livecrafts_draft_changes( $object_type, $object_id ) {
 	return livecrafts_changes_query( array( 'status' => 'draft', 'object_type' => $object_type, 'object_id' => $object_id, 'oldest_first' => true, 'limit' => 500 ) );
 }
 
-/** How many draft changes there are (site-wide). */
+/**
+ * How many changes are waiting for a person to deploy or discard them (site-wide): draft changes, plus theme-file edits
+ * that are already live but no release has accepted yet (file-changes.php).
+ */
 function livecrafts_draft_count() {
 	global $wpdb;
-	return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . livecrafts_table( 'changes' ) . ' WHERE status = %s', 'draft' ) );
+	return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . livecrafts_table( 'changes' ) . ' WHERE status = %s', 'draft' ) ) + count( livecrafts_files_pending() );
 }
 
 /** "Page “About”", "Additional CSS" ... */
-function livecrafts_object_label( $object_type, $object_id ) {
+function livecrafts_object_label( $object_type, $object_id, $target = '' ) {
 	if ( $object_type === 'css' ) return 'Additional CSS';
+	if ( $object_type === 'file' ) return $target !== '' ? 'Theme file ' . $target : 'Theme file';
 	$post = get_post( $object_id );
 	if ( ! $post ) return 'Deleted item #' . (int) $object_id;
 	$type = get_post_type_object( $post->post_type );
@@ -127,7 +131,7 @@ function livecrafts_change_public( array $c, $full = false ) {
 		'status'  => $c['status'],
 		'source'  => $c['source'],
 		'user'    => $user ? array( 'id' => (int) $user->ID, 'login' => $user->user_login, 'name' => $user->display_name ) : null,
-		'object'  => array( 'type' => $c['object_type'], 'id' => $c['object_id'], 'label' => livecrafts_object_label( $c['object_type'], $c['object_id'] ) ),
+		'object'  => array( 'type' => $c['object_type'], 'id' => $c['object_id'], 'label' => livecrafts_object_label( $c['object_type'], $c['object_id'], $c['target'] ) ),
 		'kind'    => $c['kind'],
 		'target'  => $c['target'],
 		'summary' => $c['summary'],
