@@ -102,6 +102,7 @@ function livecrafts_draft_rebuild( $post_id ) {
 			'post_type'    => LIVECRAFTS_DRAFT_TYPE,
 			'post_status'  => 'draft',
 			'post_parent'  => $post_id,
+			'page_template' => 'default', // the copy's real template is stored as meta below; WordPress would reject it for this post type
 			'post_author'  => $post->post_author,
 			'post_title'   => $data['fields']['title'],
 			'post_content' => $data['fields']['content'],
