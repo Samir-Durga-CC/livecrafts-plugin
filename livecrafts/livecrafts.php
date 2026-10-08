@@ -39,6 +39,21 @@ require_once LIVECRAFTS_DIR . 'includes/assistant.php';
 require_once LIVECRAFTS_DIR . 'includes/migrate.php';
 require_once LIVECRAFTS_DIR . 'includes/admin.php';
 
+/**
+ * Diagnostics: WordPress hides PHP fatals behind "There has been a critical error". Remember the last one (message, file,
+ * line, address) so it can be read from GET /livecrafts/v1/status (last_fatal) by an editor or the Livecrafts backend.
+ */
+register_shutdown_function( function () {
+	$e = error_get_last();
+	if ( ! $e || ! in_array( $e['type'], array( E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_RECOVERABLE_ERROR ), true ) ) return;
+	if ( ! function_exists( 'update_option' ) ) return;
+	$uri = isset( $_SERVER['REQUEST_URI'] ) ? preg_replace( '/(lc_preview|_wpnonce)=[^&]*/', '$1=…', (string) $_SERVER['REQUEST_URI'] ) : '';
+	update_option( 'livecrafts_last_fatal', array(
+		'at' => gmdate( 'c' ), 'url' => substr( $uri, 0, 300 ), 'type' => $e['type'],
+		'message' => substr( (string) $e['message'], 0, 2000 ), 'file' => str_replace( ABSPATH, '', (string) $e['file'] ), 'line' => (int) $e['line'],
+	), false );
+} );
+
 register_activation_hook( __FILE__, 'livecrafts_activate' );
 
 /** Tables, capabilities and the site secret; then move data from older versions. Safe to run more than once. */

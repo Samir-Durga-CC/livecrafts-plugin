@@ -92,6 +92,7 @@ function livecrafts_rest_status() {
 		'last_release'                  => $last,
 		'outside_changes_since_release' => array_map( 'livecrafts_change_public', $outside ),
 		'legacy_overlay'                => livecrafts_migration_report(),
+		'last_fatal'                    => get_option( 'livecrafts_last_fatal', null ),
 		'deploy'    => array( 'allowed' => livecrafts_can_deploy(), 'asks_for' => livecrafts_has_deploy_password() ? 'deploy password' : 'your WordPress password' ),
 		'note'      => 'Drafts are seen only by logged-in editors. Visitors see the live site until a person deploys.',
 	);
