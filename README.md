@@ -37,7 +37,7 @@ Edit a live WordPress site with an AI assistant or by clicking on the page - saf
 | `includes/migrate.php` | Moves the 0.9 overlay: styles → a draft CSS block to review; texts → a report. |
 | `includes/assistant.php`, `assets/widget.*` | The chat widget, the drafts bar (preview / live, discard, deploy dialog). |
 | `includes/admin.php` | Settings → Livecrafts: deploy password, old overlay, releases, recent changes. |
-| `includes/theme-files.php`, `includes/audit.php` | Theme file access for the backend; "where is this text stored" diagnostics. |
+| `includes/theme-files.php`, `includes/file-changes.php`, `includes/audit.php` | Theme file access for the backend (every write/delete is recorded in the ledger as `file.write`: revertable by id, undone by Discard all while unreleased, accepted by Deploy, restored by a reset); "where is this text stored" diagnostics. |
 
 ## Change kinds (`POST /livecrafts/v1/changes`)
 | Kind | Target | Value |
@@ -67,6 +67,7 @@ Offline checks (no database needed):
 php tests/blocks-offline.php "/path/to/wordpress"
 php tests/acf-rows-offline.php
 php tests/elementor-offline.php
+php tests/file-changes-offline.php
 ```
 
 ## Known limits
