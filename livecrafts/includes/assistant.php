@@ -117,7 +117,18 @@ add_action( 'wp_enqueue_scripts', function () {
 	wp_enqueue_style( 'livecrafts-widget', LIVECRAFTS_URL . 'assets/widget.css', array(), LIVECRAFTS_VERSION );
 	wp_enqueue_script( 'livecrafts-widget', LIVECRAFTS_URL . 'assets/widget.js', array(), LIVECRAFTS_VERSION, true );
 	$scheme = is_ssl() ? 'https' : 'http';
+	$draft_count = 0;
+	if ( function_exists( 'livecrafts_deploy_check' ) ) {
+		$check = livecrafts_deploy_check();
+		foreach ( (array) ( isset( $check['plan'] ) ? $check['plan'] : array() ) as $p ) $draft_count += count( $p['changes'] );
+	}
 	wp_localize_script( 'livecrafts-widget', 'LIVECRAFTS_WIDGET', array(
+		'restUrl'      => rest_url( 'livecrafts/v1/' ), // the widget appends routes (status, changes ...); also valid for ?rest_route= sites
+		'nonce'        => wp_create_nonce( 'wp_rest' ),
+		'widgetToken'  => livecrafts_widget_token( get_current_user_id() ),
+		'view'         => ( isset( $_COOKIE['livecrafts_view'] ) && $_COOKIE['livecrafts_view'] === 'live' ) ? 'live' : 'draft',
+		'drafts'       => $draft_count,
+		'canDeploy'    => livecrafts_can_deploy(),
 		'backend'      => $a['backend_url'],
 		'botName'      => $a['bot_name'],
 		'welcome'      => $a['welcome'],
