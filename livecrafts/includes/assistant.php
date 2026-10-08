@@ -129,6 +129,11 @@ add_action( 'wp_enqueue_scripts', function () {
 		'view'         => ( isset( $_COOKIE['livecrafts_view'] ) && $_COOKIE['livecrafts_view'] === 'live' ) ? 'live' : 'draft',
 		'drafts'       => $draft_count,
 		'canDeploy'    => livecrafts_can_deploy(),
+		'asksFor'      => livecrafts_has_deploy_password() ? 'deploy password' : 'your WordPress password',
+		'postId'       => livecrafts_current_post_id(), // the page being viewed: ACF values, featured image, page-scoped styles
+		'restRoot'     => rest_url(), // core routes (wp/v2/media for uploads from the chat)
+		'maxUpload'    => (int) wp_max_upload_size(),
+		'canUpload'    => current_user_can( 'upload_files' ),
 		'backend'      => $a['backend_url'],
 		'botName'      => $a['bot_name'],
 		'welcome'      => $a['welcome'],

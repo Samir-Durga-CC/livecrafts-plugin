@@ -65,6 +65,7 @@ function livecrafts_rest_resolve( WP_REST_Request $req ) {
 	if ( ! $r && $page && current_user_can( 'edit_post', $page ) ) {
 		$r = livecrafts_resolve_acf( $page, $req );
 	}
+	if ( ! $r ) $r = livecrafts_resolve_site_image( $page, (string) $req->get_param( 'imageSrc' ) );
 	if ( ! $r ) $r = livecrafts_resolve_theme( $page, (string) $req->get_param( 'selector' ), $device, (string) $req->get_param( 'tag' ) );
 	$r['ok']     = true;
 	$r['device'] = $device;
@@ -116,20 +117,22 @@ function livecrafts_resolve_elementor( $doc, $id, $device ) {
 	$ctl_name = function ( $c, $name ) { return wp_strip_all_tags( isset( $c['label'] ) && $c['label'] !== '' ? $c['label'] : $name ); };
 	$actions  = array();
 
-	// content: the texts, links and images this element really has
+	// content: the images, texts and links this element really has. Images come first and are never cut off by the
+	// limit on texts: they are what people click on most.
+	$images = livecrafts_el_image_actions( $node, $controls, $settings, $doc, $id, $device );
+	$texts  = array();
 	foreach ( $controls as $name => $c ) {
-		if ( count( $actions ) >= 6 ) break;
+		if ( count( $texts ) >= 6 ) break;
 		if ( $name[0] === '_' || ( isset( $c['tab'] ) && $c['tab'] !== 'content' ) ) continue;
 		$type = isset( $c['type'] ) ? $c['type'] : '';
 		$val  = isset( $settings[ $name ] ) ? $settings[ $name ] : null;
 		if ( in_array( $type, array( 'text', 'textarea', 'wysiwyg' ), true ) && is_string( $val ) && $val !== '' ) {
-			$actions[] = livecrafts_action( 'text:' . $name, 'content', 'Edit ' . strtolower( $ctl_name( $c, $name ) ), $type === 'wysiwyg' ? 'html' : 'text', $val, $change( $name ) );
+			$texts[] = livecrafts_action( 'text:' . $name, 'content', 'Edit ' . strtolower( $ctl_name( $c, $name ) ), $type === 'wysiwyg' ? 'html' : 'text', $val, $change( $name ) );
 		} elseif ( $type === 'url' && is_array( $val ) && ! empty( $val['url'] ) ) {
-			$actions[] = livecrafts_action( 'link:' . $name, 'content', 'Change link', 'url', $val['url'], $change( $name ) );
-		} elseif ( $type === 'media' && is_array( $val ) && ! empty( $val['url'] ) ) {
-			$actions[] = livecrafts_action( 'image:' . $name, 'content', 'Replace image', 'image', array( 'id' => isset( $val['id'] ) ? (int) $val['id'] : 0, 'url' => $val['url'] ), $change( $name ) );
+			$texts[] = livecrafts_action( 'link:' . $name, 'content', 'Change link', 'url', $val['url'], $change( $name ) );
 		}
 	}
+	$actions = array_merge( $images, $texts );
 
 	// style: Elementor's own controls; the variant for the screen size being looked at when the control is responsive
 	$pick = function ( array $names ) use ( $controls, $device ) {
@@ -193,6 +196,55 @@ function livecrafts_resolve_elementor( $doc, $id, $device ) {
 	if ( $parent !== '' ) {
 		$p             = livecrafts_el_node( $tree, $parent );
 		$out['parent'] = array( 'label' => livecrafts_el_label( $p ), 'elementor' => array( 'doc' => $doc, 'id' => $parent ) );
+	}
+	return $out;
+}
+
+/**
+ * The images of one Elementor element, as click-panel actions:
+ *   - its image controls (Content tab): replace, or add one where the slot is empty (a placeholder counts as an image)
+ *   - its background images (Style tab of containers/sections/columns, Advanced tab of widgets, overlay, hover): the one
+ *     shown at the screen size being looked at; replace or remove it, or add one to a container that has none
+ */
+function livecrafts_el_image_actions( array $node, array $controls, array $settings, $doc, $id, $device ) {
+	$change  = function ( $name ) use ( $doc, $id ) { return array( 'kind' => 'el.setting', 'post' => $doc, 'target' => $id . ':' . $name ); };
+	$img     = function ( $val ) { return array( 'id' => isset( $val['id'] ) ? (int) $val['id'] : 0, 'url' => (string) $val['url'] ); };
+	$out     = array();
+	$content = array();
+	foreach ( $controls as $name => $c ) {
+		if ( ( isset( $c['type'] ) ? $c['type'] : '' ) !== 'media' || $name[0] === '_' || ( isset( $c['tab'] ) && $c['tab'] !== 'content' ) ) continue;
+		if ( ! empty( $c['media_types'] ) && ! in_array( 'image', (array) $c['media_types'], true ) ) continue; // video / audio / svg-only slots
+		$content[ $name ] = $c;
+	}
+	$named = count( $content ) > 1;
+	foreach ( $content as $name => $c ) {
+		$val   = isset( $settings[ $name ] ) ? $settings[ $name ] : ( isset( $c['default'] ) ? $c['default'] : null );
+		$label = $named ? strtolower( wp_strip_all_tags( isset( $c['label'] ) && $c['label'] !== '' ? $c['label'] : $name ) ) : 'image';
+		if ( is_array( $val ) && ! empty( $val['url'] ) ) {
+			$out[] = livecrafts_action( 'image:' . $name, 'content', 'Replace ' . $label, 'image', $img( $val ), $change( $name ) );
+		} elseif ( empty( $c['condition'] ) && empty( $c['conditions'] ) ) { // only slots that are always shown
+			$out[] = livecrafts_action( 'image:' . $name, 'content', 'Add ' . ( $named ? $label : 'an image' ), 'image', null, $change( $name ) );
+		}
+	}
+
+	$el_type = isset( $node['elType'] ) ? (string) $node['elType'] : '';
+	$layers  = array( 'background' => 'background', '_background' => 'background', 'background_overlay' => 'overlay', 'background_hover' => 'hover background' );
+	foreach ( $layers as $prefix => $what ) {
+		$base = $prefix . '_image';
+		if ( ! isset( $controls[ $base ] ) || $controls[ $base ]['type'] !== 'media' ) continue;
+		$here = $base . '_' . $device; // a tablet / mobile image replaces the desktop one at that size
+		$name = $device !== 'desktop' && isset( $controls[ $here ] ) && ! empty( $settings[ $here ]['url'] ) ? $here : $base;
+		$val  = isset( $settings[ $name ] ) && is_array( $settings[ $name ] ) ? $settings[ $name ] : array();
+		$mode_name = $prefix . '_background'; // background_background, _background_background ... : '' | classic | gradient | video | slideshow
+		$mode      = isset( $settings[ $mode_name ] ) ? (string) $settings[ $mode_name ] : '';
+		$suffix    = $name === $here ? ' (' . $device . ')' : '';
+		if ( ! empty( $val['url'] ) && $mode === 'classic' ) {
+			$out[] = livecrafts_action( 'bg:' . $name, 'content', 'Replace ' . $what . ' image' . $suffix, 'image', $img( $val ), $change( $name ) );
+			$out[] = livecrafts_action( 'bg-remove:' . $name, 'content', 'Remove ' . $what . ' image' . $suffix, 'confirm', null, $change( $name ) + array( 'value' => '' ) );
+		} elseif ( $prefix === 'background' && in_array( $mode, array( '', 'classic' ), true ) && in_array( $el_type, array( 'container', 'section', 'column' ), true ) ) {
+			$extra = $mode === 'classic' ? array() : array( 'requires' => array( 'kind' => 'el.setting', 'post' => $doc, 'target' => $id . ':' . $mode_name, 'value' => 'classic' ) );
+			$out[] = livecrafts_action( 'bg:' . $base, 'content', 'Add a background image', 'image', null, $change( $base ), $extra );
+		}
 	}
 	return $out;
 }
@@ -342,6 +394,36 @@ function livecrafts_resolve_menu( $item ) {
 		'actions' => $actions,
 		'notes'   => $custom ? array() : array( 'This link points to a page; its address follows that page.' ),
 	);
+}
+
+/* ------------------------------------------------------------------ images the theme prints: featured image, logo */
+
+function livecrafts_resolve_site_image( $page, $src ) {
+	$img = livecrafts_file_base( $src );
+	if ( $img === '' ) return null;
+	if ( $page && current_user_can( 'edit_post', $page ) && post_type_supports( get_post_type( $page ), 'thumbnail' ) ) {
+		$thumb = (int) get_post_thumbnail_id( $page );
+		if ( $thumb && livecrafts_file_base( wp_get_attachment_url( $thumb ) ) === $img ) {
+			$change = array( 'kind' => 'post.meta', 'post' => $page, 'target' => '_thumbnail_id' );
+			return array(
+				'source'  => array( 'kind' => 'theme', 'label' => 'Featured image', 'post' => $page, 'where' => livecrafts_object_label( 'post', $page ) ),
+				'actions' => array(
+					livecrafts_action( 'thumb:replace', 'content', 'Replace featured image', 'image', array( 'id' => $thumb, 'url' => (string) wp_get_attachment_url( $thumb ) ), $change ),
+					livecrafts_action( 'thumb:remove', 'content', 'Remove featured image', 'confirm', null, $change + array( 'value' => '' ) ),
+				),
+				'notes'   => array(),
+			);
+		}
+	}
+	$logo = (int) get_theme_mod( 'custom_logo' );
+	if ( $logo && livecrafts_file_base( wp_get_attachment_url( $logo ) ) === $img ) {
+		return array(
+			'source'  => array( 'kind' => 'theme', 'label' => 'Site logo', 'where' => 'Site identity', 'edit_link' => admin_url( 'customize.php?autofocus[control]=custom_logo' ) ),
+			'actions' => array( livecrafts_action( 'ask', 'content', 'Change the logo (assistant)', 'ask', null, array() ) ),
+			'notes'   => array( 'This is the site logo. It is a site setting, not page content: change it in Appearance → Customize → Site Identity, or ask the assistant.' ),
+		);
+	}
+	return null;
 }
 
 /* ------------------------------------------------------------------ anything else (theme / plugin output) */

@@ -95,6 +95,11 @@
 .lcw-modal-actions .lcw-db-primary:hover { background: var(--lcw-accent, #5b5bd6); color: #fff; }
 .lcw-modal-actions .lcw-db-btn:focus-visible { outline: 2px solid var(--lcw-accent, #5b5bd6); outline-offset: 2px; }
 
+/* WordPress's media window (Choose / upload an image) above the chat panel while it is open */
+html.lcw-media-open .media-modal-backdrop { z-index: 2147483003; }
+html.lcw-media-open .media-modal { z-index: 2147483004; }
+html.lcw-media-open .uploader-window { z-index: 2147483005; }
+
 @media (max-width: 520px) {
   .lcw-draftbar { position: fixed; left: 14px; right: 82px; bottom: 22px; overflow-x: auto; }
   .lcw-db-text { display: none; }

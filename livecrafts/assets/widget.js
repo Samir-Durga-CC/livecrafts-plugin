@@ -66,6 +66,7 @@
 			widgetVersion: C.version || "0.9.0", pageKey: C.pageKey || "", postId: C.postId || 0,
 			// who the person is, signed by this site (the backend credits every change to them)
 			widgetToken: C.widgetToken || "", view: C.view || "draft", drafts: Number(C.drafts) || 0, canDeploy: !!C.canDeploy,
+			canUpload: !!C.canUpload, maxUpload: Number(C.maxUpload) || 0,
 		};
 		return C.backend.replace(/\/+$/, "") + "/?embed=1&v=" + encodeURIComponent(C.version || "") + "#cfg=" + encodeURIComponent(JSON.stringify(cfg));
 	}
@@ -76,7 +77,8 @@
 			frame.className = "lcw-frame";
 			frame.title = C.botName || "Assistant";
 			// "local-network-access": Chrome/Edge only let a public site load an app on this computer after the person allows it.
-			frame.allow = "clipboard-write; local-network-access; local-network";
+			// microphone + autoplay: the voice mode listens and answers aloud (the browser still asks the person first).
+			frame.allow = "clipboard-write; local-network-access; local-network; microphone; autoplay";
 			frame.src = frameUrl();
 			var isLocal = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(backendOrigin);
 			var err = document.createElement("div");
@@ -128,10 +130,28 @@
 	}
 	function inWidget(el) { return !!(el && el.closest && (el.closest("[data-livecrafts]") || el === box || el === hint || box.contains(el))); }
 	function onMove(e) {
-		var el = document.elementFromPoint(e.clientX, e.clientY);
-		if (!el || inWidget(el) || el === document.body || el === document.documentElement) { box.hidden = true; hovered = null; return; }
+		var el = targetAt(e.clientX, e.clientY);
+		if (!el) { box.hidden = true; hovered = null; return; }
 		hovered = el;
 		outline(el);
+	}
+	/**
+	 * What a click at this point means. Usually the top element; but an EMPTY layer on top of a picture (a link layer, a
+	 * gradient overlay, a hover effect) would swallow the click - then the picture underneath is meant.
+	 */
+	function targetAt(x, y) {
+		var stack = document.elementsFromPoint ? document.elementsFromPoint(x, y) : [document.elementFromPoint(x, y)];
+		var top = null, i;
+		for (i = 0; i < stack.length; i++) { if (stack[i] && !inWidget(stack[i])) { top = stack[i]; break; } }
+		if (!top || top === document.body || top === document.documentElement) return null;
+		if (top.tagName === "IMG" || (top.querySelector && top.querySelector("img")) || (top.innerText || "").trim() !== "") return top;
+		for (i = 0; i < stack.length; i++) {
+			var el = stack[i];
+			if (!el || el === top || inWidget(el)) continue;
+			if (el === document.body || el === document.documentElement) break;
+			if (el.tagName === "IMG") return el;
+		}
+		return top;
 	}
 	function outline(el) {
 		var r = el.getBoundingClientRect();
@@ -142,7 +162,7 @@
 	function onClick(e) {
 		if (inWidget(e.target)) return;
 		e.preventDefault(); e.stopPropagation();
-		var el = hovered || e.target;
+		var el = targetAt(e.clientX, e.clientY) || hovered || e.target;
 		stopPick();
 		select(el);
 	}
@@ -522,9 +542,9 @@
 	root.appendChild(bar);
 
 	/** A Livecrafts REST address. Works with pretty permalinks (/wp-json/...) and with ?rest_route=/... sites. */
-	function endpoint(path) {
+	function endpoint(path, root) {
 		var q = path.indexOf("?"), route = q < 0 ? path : path.slice(0, q), query = q < 0 ? "" : path.slice(q + 1);
-		var u = new URL(String(C.restUrl || ""), location.href);
+		var u = new URL(String(root || C.restUrl || ""), location.href);
 		if (u.searchParams.has("rest_route")) {
 			u.searchParams.set("rest_route", u.searchParams.get("rest_route").replace(/\/?$/, "/") + route);
 		} else {
@@ -650,7 +670,40 @@
 		else if (e.data.type === "lc:drafts-changed" || e.data.type === "lc:ready") refreshDrafts();
 		else if (e.data.type === "lc:wp" && e.data.id) wpForChat(e.data);
 		else if (e.data.type === "lc:media" && e.data.id) pickMedia(e.data.id);
+		else if (e.data.type === "lc:upload" && e.data.id) uploadMedia(e.data);
 	});
+
+	// An image from the person's computer, sent by the chat: saved into the WordPress Media Library as the logged-in
+	// person (core route wp/v2/media, their nonce). The Media Library is not public content, so this is not a draft.
+	var EXT = { "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif", "image/webp": "webp", "image/avif": "avif", "image/svg+xml": "svg" };
+	function uploadMedia(d) {
+		var reply = function (ok, data) { send({ type: "lc:upload-result", id: d.id, ok: ok, attachment: ok ? data : undefined, error: ok ? undefined : data }); };
+		var file = d.file;
+		if (!C.canUpload) return reply(false, "Your WordPress account cannot upload files.");
+		if (!file || typeof file.size !== "number" || !/^image\//.test(file.type || "")) return reply(false, "Only image files can be uploaded here.");
+		if (C.maxUpload && file.size > C.maxUpload) return reply(false, "The image is " + (file.size / 1048576).toFixed(1) + " MB; this site accepts up to " + (C.maxUpload / 1048576).toFixed(0) + " MB per file.");
+		var name = String(d.name || file.name || "image").replace(/[^\w.\- ]+/g, "-").replace(/^[.\- ]+/, "").slice(0, 120) || "image";
+		if (!/\.[a-z0-9]{2,5}$/i.test(name)) name += "." + (EXT[file.type] || "jpg");
+		fetch(endpoint("wp/v2/media", C.restRoot), {
+			method: "POST", credentials: "same-origin", body: file,
+			headers: { "X-WP-Nonce": C.nonce, "Content-Type": file.type, "Content-Disposition": 'attachment; filename="' + name + '"' },
+		}).then(function (r) {
+			return r.json().catch(function () { return {}; }).then(function (j) {
+				if (!r.ok || !j.id) throw new Error(j && j.message ? j.message : "WordPress refused the upload (HTTP " + r.status + ").");
+				var meta = {};
+				if (d.alt) meta.alt_text = String(d.alt).slice(0, 300);
+				if (d.title) meta.title = String(d.title).slice(0, 200);
+				var done = function (a) {
+					var det = a.media_details || {};
+					reply(true, { id: a.id, url: a.source_url, alt: a.alt_text || "", width: det.width, height: det.height, title: a.title && a.title.rendered ? a.title.rendered : name });
+				};
+				if (!Object.keys(meta).length) return done(j);
+				return fetch(endpoint("wp/v2/media/" + j.id, C.restRoot), {
+					method: "POST", credentials: "same-origin", headers: { "X-WP-Nonce": C.nonce, "Content-Type": "application/json" }, body: JSON.stringify(meta),
+				}).then(function (r2) { return r2.ok ? r2.json() : j; }, function () { return j; }).then(done);
+			});
+		}).catch(function (e) { reply(false, e && e.message ? e.message : "The upload failed."); });
+	}
 
 	// The chat panel's own edits (click panel, Changes tab) go to WordPress from here, as the logged-in person, with
 	// their nonce - never through the backend. Only these Livecrafts routes; deploying stays in the dialog above.
@@ -676,6 +729,10 @@
 		if (!window.wp || !window.wp.media) { send({ type: "lc:media-result", id: id, ok: false, error: "The Media Library is not available on this page." }); return; }
 		var frame = window.wp.media({ title: "Choose an image", library: { type: "image" }, multiple: false, button: { text: "Use this image" } });
 		var picked = false;
+		// The chat panel sits on top of everything; WordPress's media window must come above it while it is open
+		// (otherwise the panel covers its "Use this image" button and the upload area).
+		document.documentElement.classList.add("lcw-media-open");
+		frame.on("close", function () { document.documentElement.classList.remove("lcw-media-open"); });
 		frame.on("select", function () {
 			picked = true;
 			var a = frame.state().get("selection").first().toJSON();
