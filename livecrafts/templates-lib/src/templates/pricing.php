@@ -27,7 +27,7 @@ $cols    = count( $items ) >= 3 ? ai_cls( 'lg:grid-cols-3' ) : ai_cls( 'lg:grid-
 	      $muted_c  = $featured ? ai_cls( 'text-gray-300' ) : ai_cls( 'text-muted' );
 	      $check_c  = $featured ? ai_cls( 'text-brand-300' ) : ai_cls( 'text-brand-600' );
 	      ?>
-      <div class="<?php echo esc_attr( ai_cls( 'relative flex flex-col rounded-3xl p-8 ring-1 ring-inset' ) . ' ' . $card ); ?>">
+      <div class="<?php echo esc_attr( ai_cls( 'relative flex flex-col rounded-band p-8 ring-1 ring-inset' ) . ' ' . $card ); ?>">
         <?php if ( $featured ) : ?>
         <p class="absolute -top-3 right-8 m-0 rounded-full bg-brand-600 px-3 py-1 text-xs font-semibold text-white">Most popular</p>
         <?php endif; ?>

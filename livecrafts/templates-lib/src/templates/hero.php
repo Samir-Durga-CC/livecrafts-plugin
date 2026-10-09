@@ -10,7 +10,7 @@ $text    = $args['text'] ?? '';
 $image   = $args['image'] ?? '';
 ?>
 <section class="ai-c overflow-hidden bg-surface">
-  <div class="mx-auto grid max-w-wide items-center gap-12 px-4 py-16 sm:px-6 sm:py-20 lg:grid-cols-2 lg:gap-16 lg:px-8 lg:py-28">
+  <div class="mx-auto grid max-w-wide items-center gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:gap-16 lg:px-8 py-sec-sm sm:py-sec">
     <div>
       <?php if ( $eyebrow ) : ?>
       <p class="mb-5 mt-0 inline-flex items-center rounded-full bg-brand-50 px-3 py-1 text-sm font-medium text-brand-700 ring-1 ring-inset ring-brand-200"><?php echo esc_html( $eyebrow ); ?></p>
@@ -32,7 +32,7 @@ $image   = $args['image'] ?? '';
     </div>
     <?php if ( $image ) : ?>
     <div class="relative">
-      <div class="absolute -inset-4 rounded-3xl bg-brand-50" aria-hidden="true"></div>
+      <div class="absolute -inset-4 rounded-band bg-brand-50" aria-hidden="true"></div>
       <img alt="" src="<?php echo esc_url( $image ); ?>" class="relative block aspect-4/3 h-auto w-full max-w-full rounded-card object-cover shadow-xl ring-1 ring-gray-950/10" />
     </div>
     <?php endif; ?>

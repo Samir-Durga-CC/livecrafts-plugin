@@ -8,7 +8,7 @@ $heading = $args['heading'] ?? '';
 $text    = $args['text'] ?? '';
 $items   = ai_items( $args );
 ?>
-<section class="ai-c ai:bg-brand-900 ai:py-16 ai:sm:py-20">
+<section class="ai-c ai:bg-brand-900 ai:py-sec-sm ai:sm:py-sec">
   <div class="ai:mx-auto ai:max-w-wide ai:px-4 ai:sm:px-6 ai:lg:px-8">
     <?php if ( $heading ) : ?>
     <div class="ai:mx-auto ai:max-w-2xl ai:text-center">

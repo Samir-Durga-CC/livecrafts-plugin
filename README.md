@@ -1,4 +1,4 @@
-# Livecrafts (WordPress plugin, 0.13)
+# Livecrafts (WordPress plugin, 0.14)
 
 Edit a live WordPress site with an AI assistant or by clicking on the page - safely:
 
@@ -95,6 +95,7 @@ Administrators have both, Editors get `livecrafts_edit`; give them to other role
 | `includes/migrate.php` | Moves the 0.9 overlay: styles → a draft CSS block to review; texts → a report. |
 | `includes/assistant.php`, `assets/widget.*` | The chat widget, the drafts bar (preview / live, discard, deploy dialog). |
 | `includes/admin.php` | Settings → Livecrafts: deploy password, old overlay, releases, recent changes. |
+| `includes/templates.php`, `templates-lib/` | Template library (25 ready sections, shortcodes `[ai_hero ...]`): catalogue + usage endpoint `GET /templates`, `?lc_templates=1` outline for editors, usage table in Settings → Livecrafts. |
 | `includes/theme-files.php`, `includes/file-changes.php`, `includes/audit.php` | Theme file access for the backend (every write/delete is recorded in the ledger as `file.write`: revertable by id, undone by Discard all while unreleased, accepted by Deploy, restored by a reset); "where is this text stored" diagnostics. |
 
 ## Change kinds (`POST /livecrafts/v1/changes`)
@@ -127,6 +128,23 @@ php tests/acf-rows-offline.php
 php tests/elementor-offline.php
 php tests/file-changes-offline.php
 ```
+
+## Template library (0.14)
+`templates-lib/` is a Tailwind v4 component library (hero, hero_centered, cta, feature_grid, steps, stats, logo_cloud, testimonials, team, pricing, faq,
+card, blog_grid, newsletter, contact_form, header, footer, sidebar, breadcrumbs, pagination, announcement, button, badge, alert, empty_state).
+The assistant fills them with content only; each is ONE shortcode (`[ai_faq heading="..."][ai_item title="..." text="..."][/ai_faq]`), so it works in
+Elementor (Shortcode widget), blocks, Divi, WPBakery, classic content, and from PHP / ACF loops with `ai_component( 'card', array(...) )`.
+
+* **Follows the site:** components read tokens (`--ai-surface`, `--ai-ink`, `--ai-muted`, `--ai-line`, `--ai-radius`, `--ai-max`, `--ai-py`, `--ai-py-sm`, `--ai-brand`).
+  Fallback chain: token -> the block theme's own palette (`--wp--preset--color--base / contrast / primary`) -> neutral default. Per section, set them with
+  shortcode attributes (`max`, `py`, `py_sm`, `radius`, `brand`, `surface`, `ink`, `muted`, `line`, `font`); the assistant measures the page's own sections and fills them in.
+* **See that it is used:** every template renders inside `<div class="ai-t" data-lc-template="faq">`. Open any page as an editor with `?lc_templates=1`:
+  template sections are outlined and labelled, with a count in the corner. Settings → Livecrafts → Templates lists, per template, the pages that use it (live or draft)
+  and URLs where theme code rendered it. `GET /livecrafts/v1/templates` returns the same for the backend.
+* **Develop:** edit `templates-lib/src/templates/*.php` (plain Tailwind classes; use the semantic ones: `bg-surface`, `text-ink`, `text-muted`, `border-line`, `rounded-card`,
+  `max-w-wide`, `py-sec-sm sm:py-sec`), then in `templates-lib/`: `python tools/prefix.py && npx tailwindcss -i src/input.css -o assets/css/ai-components.css --minify && python tools/check.py`.
+  Never edit `templates/` by hand. If the standalone "AI Components" plugin is active it is used instead of the bundled copy.
+* Not run on a live WordPress yet: PHP was syntax-checked and the CSS fit was verified in Chrome on static renders of the templates.
 
 ## Known limits
 * Elementor support is built on Elementor's own APIs (controls registry, `Document::save`, preview CSS) and covered by

@@ -20,6 +20,7 @@
   --color-line: var(--ai-line, color-mix(in oklab, var(--ai-ink, var(--wp--preset--color--contrast, #111827)) 14%, var(--ai-surface, var(--wp--preset--color--base, #ffffff))));
   --radius-card: var(--ai-radius, 1rem);
   --radius-ctl: calc(var(--ai-radius, 1rem) * 0.75);
+  --radius-band: calc(var(--ai-radius, 1rem) * 1.5);
   --container-wide: var(--ai-max, 80rem);
   --spacing-sec: var(--ai-py, 6rem);
   --spacing-sec-sm: var(--ai-py-sm, 4rem);

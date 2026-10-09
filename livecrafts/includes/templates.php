@@ -9,8 +9,9 @@
  *                                           which parts of the page come from a template
  *   Settings > Livecrafts > Templates       the same usage table
  *
- * Nothing here changes content. A site-wide design fit (colours, container width, section spacing, radius) is stored in the
- * option "livecrafts_template_fit" and applied as CSS variables, or per section with the fit attributes (max, py, radius ...).
+ * Nothing here changes content. The design fit (colours, container width, section spacing, radius) travels with each section as
+ * shortcode attributes (max, py, radius ...), so it is part of the draft and can be reverted. Developers can also set site-wide
+ * defaults in the option "livecrafts_template_fit" (applied as CSS variables).
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -56,7 +57,7 @@ function livecrafts_templates_catalogue() {
 	$out = array();
 	foreach ( ai_components_registry() as $name => $def ) {
 		$file = AI_COMPONENTS_DIR . 'templates/' . str_replace( '_', '-', $name ) . '.php';
-		$doc  = file_exists( $file ) ? livecrafts_template_doc( $file ) : livecrafts_template_doc( '' );
+		$doc  = file_exists( $file ) ? livecrafts_template_doc( $file ) : array( 'title' => '', 'params' => '', 'shortcode' => '', 'items' => '' );
 		$out[ $name ] = array(
 			'id'         => $name,
 			'shortcode'  => 'ai_' . $name,
@@ -171,9 +172,6 @@ add_action( 'rest_api_init', function () {
 	register_rest_route( 'livecrafts/v1', '/templates', array(
 		array( 'methods' => 'GET', 'callback' => 'livecrafts_rest_templates', 'permission_callback' => 'livecrafts_rest_permission' ),
 	) );
-	register_rest_route( 'livecrafts/v1', '/templates/fit', array(
-		array( 'methods' => 'POST', 'callback' => 'livecrafts_rest_templates_fit', 'permission_callback' => 'livecrafts_rest_deploy_permission' ),
-	) );
 } );
 
 function livecrafts_rest_templates() {
@@ -192,19 +190,6 @@ function livecrafts_rest_templates() {
 		'howToCheck' => 'Open any page as an editor with ?lc_templates=1: every template section is outlined and labelled.',
 		'components' => array_values( $cat ),
 	);
-}
-
-/** Save the site-wide fit (CSS variables). Deploy permission: it changes how the live site looks at once. */
-function livecrafts_rest_templates_fit( WP_REST_Request $req ) {
-	if ( ! livecrafts_templates_active() ) return new WP_Error( 'livecrafts_templates', 'The template library is not active.', array( 'status' => 400 ) );
-	$in   = (array) $req->get_json_params();
-	$fit  = isset( $in['fit'] ) && is_array( $in['fit'] ) ? $in['fit'] : array();
-	$keep = array();
-	foreach ( ai_fit_keys() as $key => $def ) {
-		if ( ! empty( $fit[ $key ] ) && '' !== ai_css_value( $fit[ $key ], $def[1] ) ) $keep[ $key ] = sanitize_text_field( $fit[ $key ] );
-	}
-	update_option( 'livecrafts_template_fit', $keep, false );
-	return array( 'ok' => true, 'fit' => $keep );
 }
 
 /* ------------------------------------------------------------------ see it: ?lc_templates=1 */

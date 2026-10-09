@@ -11,7 +11,7 @@ $note    = $args['note'] ?? '';
 ?>
 <section class="ai-c relative isolate overflow-hidden bg-surface">
   <div class="absolute inset-x-0 top-0 -z-10 h-72 bg-linear-to-b from-brand-50 to-white" aria-hidden="true"></div>
-  <div class="mx-auto max-w-4xl px-4 py-20 text-center sm:px-6 sm:py-28 lg:px-8 lg:py-32">
+  <div class="mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8 py-sec-sm sm:py-sec">
     <?php if ( $eyebrow ) : ?>
     <p class="mb-6 mt-0 inline-flex items-center rounded-full bg-surface px-3 py-1 text-sm font-medium text-brand-700 shadow-sm ring-1 ring-inset ring-brand-200"><?php echo esc_html( $eyebrow ); ?></p>
     <?php endif; ?>

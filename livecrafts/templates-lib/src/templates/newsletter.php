@@ -13,7 +13,7 @@ $placeholder  = $args['placeholder'] ?? 'Enter your email';
 $note         = $args['note'] ?? '';
 ?>
 <section class="ai-c bg-surface px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
-  <div class="mx-auto grid max-w-wide items-center gap-8 rounded-3xl bg-brand-50 px-6 py-12 ring-1 ring-inset ring-brand-100 sm:px-12 lg:grid-cols-2 lg:gap-16">
+  <div class="mx-auto grid max-w-wide items-center gap-8 rounded-band bg-brand-50 px-6 py-12 ring-1 ring-inset ring-brand-100 sm:px-12 lg:grid-cols-2 lg:gap-16">
     <div>
       <h2 class="m-0 text-2xl font-semibold tracking-tight text-balance text-ink sm:text-3xl"><?php echo esc_html( $heading ); ?></h2>
       <?php if ( $text ) : ?><p class="mt-3 mb-0 text-base text-pretty text-muted"><?php echo esc_html( $text ); ?></p><?php endif; ?>

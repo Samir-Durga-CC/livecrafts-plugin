@@ -10,7 +10,7 @@ $text    = $args['text'] ?? '';
 $image   = $args['image'] ?? '';
 ?>
 <section class="ai-c ai:overflow-hidden ai:bg-surface">
-  <div class="ai:mx-auto ai:grid ai:max-w-wide ai:items-center ai:gap-12 ai:px-4 ai:py-16 ai:sm:px-6 ai:sm:py-20 ai:lg:grid-cols-2 ai:lg:gap-16 ai:lg:px-8 ai:lg:py-28">
+  <div class="ai:mx-auto ai:grid ai:max-w-wide ai:items-center ai:gap-12 ai:px-4 ai:sm:px-6 ai:lg:grid-cols-2 ai:lg:gap-16 ai:lg:px-8 ai:py-sec-sm ai:sm:py-sec">
     <div>
       <?php if ( $eyebrow ) : ?>
       <p class="ai:mb-5 ai:mt-0 ai:inline-flex ai:items-center ai:rounded-full ai:bg-brand-50 ai:px-3 ai:py-1 ai:text-sm ai:font-medium ai:text-brand-700 ai:ring-1 ai:ring-inset ai:ring-brand-200"><?php echo esc_html( $eyebrow ); ?></p>
@@ -32,7 +32,7 @@ $image   = $args['image'] ?? '';
     </div>
     <?php if ( $image ) : ?>
     <div class="ai:relative">
-      <div class="ai:absolute ai:-inset-4 ai:rounded-3xl ai:bg-brand-50" aria-hidden="true"></div>
+      <div class="ai:absolute ai:-inset-4 ai:rounded-band ai:bg-brand-50" aria-hidden="true"></div>
       <img alt="" src="<?php echo esc_url( $image ); ?>" class="ai:relative ai:block ai:aspect-4/3 ai:h-auto ai:w-full ai:max-w-full ai:rounded-card ai:object-cover ai:shadow-xl ai:ring-1 ai:ring-gray-950/10" />
     </div>
     <?php endif; ?>
