@@ -1,12 +1,8 @@
 <?php
 /**
- * Plugin Name: AI Components
+ * AI Components template library (bundled inside Livecrafts; not a separate plugin)
  * Description: 25 reusable, theme-independent UI components (hero, cards, pricing, FAQ, header, footer and more) as template parts and shortcodes. Works in Elementor, Divi, WPBakery and custom/ACF themes. One brand color variable re-themes everything.
- * Version: 1.2.0
- * Requires at least: 6.1
- * Requires PHP: 7.4
- * License: GPL-2.0-or-later
- * Text Domain: ai-components
+ * Library version: 1.2.0
  */
 
 defined( 'ABSPATH' ) || exit;

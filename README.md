@@ -1,4 +1,4 @@
-# Livecrafts (WordPress plugin, 0.14)
+# Livecrafts (WordPress plugin, 0.14.1)
 
 Edit a live WordPress site with an AI assistant or by clicking on the page - safely:
 
@@ -143,7 +143,7 @@ Elementor (Shortcode widget), blocks, Divi, WPBakery, classic content, and from 
   and URLs where theme code rendered it. `GET /livecrafts/v1/templates` returns the same for the backend.
 * **Develop:** edit `templates-lib/src/templates/*.php` (plain Tailwind classes; use the semantic ones: `bg-surface`, `text-ink`, `text-muted`, `border-line`, `rounded-card`,
   `max-w-wide`, `py-sec-sm sm:py-sec`), then in `templates-lib/`: `python tools/prefix.py && npx tailwindcss -i src/input.css -o assets/css/ai-components.css --minify && python tools/check.py`.
-  Never edit `templates/` by hand. If the standalone "AI Components" plugin is active it is used instead of the bundled copy.
+  Never edit `templates/` by hand. The library file has no plugin header on purpose: it is part of Livecrafts, not a second plugin, and cannot be activated on its own.
 * Not run on a live WordPress yet: PHP was syntax-checked and the CSS fit was verified in Chrome on static renders of the templates.
 
 ## Known limits
