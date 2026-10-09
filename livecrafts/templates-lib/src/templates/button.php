@@ -12,7 +12,7 @@ $icon    = $args['icon'] ?? 'arrow-right';
 
 $variants = array(
 	'solid'       => ai_cls( 'bg-brand-600 text-white shadow-sm hover:bg-brand-700 focus-visible:outline-brand-600' ),
-	'outline'     => ai_cls( 'bg-white text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus-visible:outline-brand-600' ),
+	'outline'     => ai_cls( 'bg-surface text-ink ring-1 ring-inset ring-gray-300 hover:bg-surface-alt focus-visible:outline-brand-600' ),
 	'ghost'       => ai_cls( 'text-brand-700 hover:bg-brand-50 focus-visible:outline-brand-600' ),
 	'light'       => ai_cls( 'bg-white text-brand-700 shadow-sm hover:bg-brand-50 focus-visible:outline-white' ),
 	'ghost-light' => ai_cls( 'text-white ring-1 ring-inset ring-white/40 hover:bg-white/10 focus-visible:outline-white' ),

@@ -8,11 +8,11 @@ $heading = $args['heading'] ?? '';
 $text    = $args['text'] ?? '';
 $dark    = 'light' !== ( $args['style'] ?? 'brand' );
 $wrap    = $dark ? ai_cls( 'bg-brand-700' ) : ai_cls( 'bg-brand-50 ring-1 ring-inset ring-brand-100' );
-$h       = $dark ? ai_cls( 'text-white' ) : ai_cls( 'text-gray-900' );
-$p       = $dark ? ai_cls( 'text-brand-100' ) : ai_cls( 'text-gray-600' );
+$h       = $dark ? ai_cls( 'text-white' ) : ai_cls( 'text-ink' );
+$p       = $dark ? ai_cls( 'text-brand-100' ) : ai_cls( 'text-muted' );
 ?>
-<section class="ai-c bg-white px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
-  <div class="<?php echo esc_attr( ai_cls( 'mx-auto max-w-7xl overflow-hidden rounded-3xl px-6 py-14 text-center sm:px-16 sm:py-20' ) . ' ' . $wrap ); ?>">
+<section class="ai-c bg-surface px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
+  <div class="<?php echo esc_attr( ai_cls( 'mx-auto max-w-wide overflow-hidden rounded-3xl px-6 py-14 text-center sm:px-16 sm:py-20' ) . ' ' . $wrap ); ?>">
     <h2 class="<?php echo esc_attr( ai_cls( 'mx-auto m-0 max-w-2xl text-3xl font-semibold tracking-tight text-balance sm:text-4xl' ) . ' ' . $h ); ?>"><?php echo esc_html( $heading ); ?></h2>
     <?php if ( $text ) : ?>
     <p class="<?php echo esc_attr( ai_cls( 'mx-auto mt-5 mb-0 max-w-xl text-lg text-pretty' ) . ' ' . $p ); ?>"><?php echo esc_html( $text ); ?></p>

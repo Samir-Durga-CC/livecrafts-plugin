@@ -10,15 +10,29 @@
 @import "tailwindcss/utilities.css" layer(utilities) prefix(ai) important;
 
 @theme inline {
-  --color-brand-50: color-mix(in oklab, var(--ai-brand, #4f46e5) 7%, white);
-  --color-brand-100: color-mix(in oklab, var(--ai-brand, #4f46e5) 14%, white);
-  --color-brand-200: color-mix(in oklab, var(--ai-brand, #4f46e5) 28%, white);
-  --color-brand-300: color-mix(in oklab, var(--ai-brand, #4f46e5) 50%, white);
-  --color-brand-500: color-mix(in oklab, var(--ai-brand, #4f46e5), white 12%);
-  --color-brand-600: var(--ai-brand, #4f46e5);
-  --color-brand-700: color-mix(in oklab, var(--ai-brand, #4f46e5), black 18%);
-  --color-brand-800: color-mix(in oklab, var(--ai-brand, #4f46e5), black 36%);
-  --color-brand-900: color-mix(in oklab, var(--ai-brand, #4f46e5), black 58%);
+  /* Theme tokens. Every component reads these; a site (or one section) sets --ai-* to match its own design.
+     Fallback chain: --ai-* -> the block theme's own palette (--wp--preset--*) -> the neutral default. */
+  --color-surface: var(--ai-surface, var(--wp--preset--color--base, #ffffff));
+  --color-surface-alt: var(--ai-surface-alt, color-mix(in oklab, var(--ai-surface, var(--wp--preset--color--base, #ffffff)), var(--ai-ink, var(--wp--preset--color--contrast, #111827)) 4%));
+  --color-ink: var(--ai-ink, var(--wp--preset--color--contrast, #111827));
+  --color-muted: var(--ai-muted, color-mix(in oklab, var(--ai-ink, var(--wp--preset--color--contrast, #111827)) 72%, var(--ai-surface, var(--wp--preset--color--base, #ffffff))));
+  --color-subtle: var(--ai-subtle, color-mix(in oklab, var(--ai-ink, var(--wp--preset--color--contrast, #111827)) 58%, var(--ai-surface, var(--wp--preset--color--base, #ffffff))));
+  --color-line: var(--ai-line, color-mix(in oklab, var(--ai-ink, var(--wp--preset--color--contrast, #111827)) 14%, var(--ai-surface, var(--wp--preset--color--base, #ffffff))));
+  --radius-card: var(--ai-radius, 1rem);
+  --radius-ctl: calc(var(--ai-radius, 1rem) * 0.75);
+  --container-wide: var(--ai-max, 80rem);
+  --spacing-sec: var(--ai-py, 6rem);
+  --spacing-sec-sm: var(--ai-py-sm, 4rem);
+
+  --color-brand-50: color-mix(in oklab, var(--ai-brand, var(--wp--preset--color--primary, #4f46e5)) 7%, white);
+  --color-brand-100: color-mix(in oklab, var(--ai-brand, var(--wp--preset--color--primary, #4f46e5)) 14%, white);
+  --color-brand-200: color-mix(in oklab, var(--ai-brand, var(--wp--preset--color--primary, #4f46e5)) 28%, white);
+  --color-brand-300: color-mix(in oklab, var(--ai-brand, var(--wp--preset--color--primary, #4f46e5)) 50%, white);
+  --color-brand-500: color-mix(in oklab, var(--ai-brand, var(--wp--preset--color--primary, #4f46e5)), white 12%);
+  --color-brand-600: var(--ai-brand, var(--wp--preset--color--primary, #4f46e5));
+  --color-brand-700: color-mix(in oklab, var(--ai-brand, var(--wp--preset--color--primary, #4f46e5)), black 18%);
+  --color-brand-800: color-mix(in oklab, var(--ai-brand, var(--wp--preset--color--primary, #4f46e5)), black 36%);
+  --color-brand-900: color-mix(in oklab, var(--ai-brand, var(--wp--preset--color--primary, #4f46e5)), black 58%);
 }
 
 /*

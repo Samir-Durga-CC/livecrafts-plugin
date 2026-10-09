@@ -19,20 +19,20 @@ $base = ai_cls( 'inline-flex size-10 items-center justify-center rounded-lg text
 <nav aria-label="Pagination" class="ai-c">
   <ul class="m-0 flex list-none flex-wrap items-center justify-center gap-1 p-0">
     <?php if ( $current > 1 ) : ?>
-    <li class="m-0 p-0"><a href="<?php echo esc_url( $link( $current - 1 ) ); ?>" aria-label="Previous page" class="<?php echo esc_attr( $base . ' ' . ai_cls( 'text-gray-600 hover:bg-gray-100' ) ); ?>"><?php ai_e_icon( 'chevron-left', 5 ); ?></a></li>
+    <li class="m-0 p-0"><a href="<?php echo esc_url( $link( $current - 1 ) ); ?>" aria-label="Previous page" class="<?php echo esc_attr( $base . ' ' . ai_cls( 'text-muted hover:bg-gray-100' ) ); ?>"><?php ai_e_icon( 'chevron-left', 5 ); ?></a></li>
     <?php endif; ?>
     <?php
     $prev = 0;
     foreach ( $pages as $n ) :
 	    if ( $n - $prev > 1 ) :
 		    ?>
-    <li class="m-0 p-0"><span class="inline-flex size-10 items-center justify-center text-sm text-gray-500">&hellip;</span></li>
+    <li class="m-0 p-0"><span class="inline-flex size-10 items-center justify-center text-sm text-subtle">&hellip;</span></li>
 	    <?php endif; ?>
     <li class="m-0 p-0">
       <?php if ( $n === $current ) : ?>
       <span aria-current="page" class="<?php echo esc_attr( $base . ' ' . ai_cls( 'bg-brand-600 text-white' ) ); ?>"><?php echo esc_html( $n ); ?></span>
       <?php else : ?>
-      <a href="<?php echo esc_url( $link( $n ) ); ?>" class="<?php echo esc_attr( $base . ' ' . ai_cls( 'text-gray-700 hover:bg-gray-100' ) ); ?>"><?php echo esc_html( $n ); ?></a>
+      <a href="<?php echo esc_url( $link( $n ) ); ?>" class="<?php echo esc_attr( $base . ' ' . ai_cls( 'text-muted hover:bg-gray-100' ) ); ?>"><?php echo esc_html( $n ); ?></a>
       <?php endif; ?>
     </li>
 	    <?php
@@ -40,7 +40,7 @@ $base = ai_cls( 'inline-flex size-10 items-center justify-center rounded-lg text
     endforeach;
     ?>
     <?php if ( $current < $total ) : ?>
-    <li class="m-0 p-0"><a href="<?php echo esc_url( $link( $current + 1 ) ); ?>" aria-label="Next page" class="<?php echo esc_attr( $base . ' ' . ai_cls( 'text-gray-600 hover:bg-gray-100' ) ); ?>"><?php ai_e_icon( 'chevron-right', 5 ); ?></a></li>
+    <li class="m-0 p-0"><a href="<?php echo esc_url( $link( $current + 1 ) ); ?>" aria-label="Next page" class="<?php echo esc_attr( $base . ' ' . ai_cls( 'text-muted hover:bg-gray-100' ) ); ?>"><?php ai_e_icon( 'chevron-right', 5 ); ?></a></li>
     <?php endif; ?>
   </ul>
 </nav>

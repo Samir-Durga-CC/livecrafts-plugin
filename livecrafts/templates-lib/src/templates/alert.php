@@ -15,7 +15,7 @@ $map   = array(
 );
 $s = $map[ $type ] ?? $map['info'];
 ?>
-<div role="alert" class="<?php echo esc_attr( ai_cls( 'ai-c flex gap-3 rounded-xl p-4 ring-1 ring-inset' ) . ' ' . $s['box'] ); ?>">
+<div role="alert" class="<?php echo esc_attr( ai_cls( 'ai-c flex gap-3 rounded-ctl p-4 ring-1 ring-inset' ) . ' ' . $s['box'] ); ?>">
   <span class="<?php echo esc_attr( ai_cls( 'mt-0.5' ) . ' ' . $s['ic'] ); ?>"><?php ai_e_icon( $s['icon'], 5 ); ?></span>
   <div>
     <?php if ( $title ) : ?>

@@ -13,7 +13,7 @@ foreach ( ai_items( $args ) as $item ) {
 }
 ?>
 <footer class="ai-c bg-gray-900">
-  <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+  <div class="mx-auto max-w-wide px-4 py-14 sm:px-6 lg:px-8">
     <div class="grid gap-12 lg:grid-cols-3">
       <div>
         <p class="m-0 text-lg font-bold text-white"><?php echo esc_html( $logo_text ); ?></p>
@@ -33,7 +33,7 @@ foreach ( ai_items( $args ) as $item ) {
       </div>
     </div>
     <?php if ( $copyright ) : ?>
-    <p class="m-0 mt-12 border-t border-gray-800 pt-8 text-sm text-gray-500">&copy; <?php echo esc_html( $copyright ); ?></p>
+    <p class="m-0 mt-12 border-t border-gray-800 pt-8 text-sm text-subtle">&copy; <?php echo esc_html( $copyright ); ?></p>
     <?php endif; ?>
   </div>
 </footer>

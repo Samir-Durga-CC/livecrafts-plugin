@@ -9,7 +9,7 @@ $text    = $args['text'] ?? '';
 $items   = ai_items( $args );
 ?>
 <section class="ai-c ai:bg-brand-900 ai:py-16 ai:sm:py-20">
-  <div class="ai:mx-auto ai:max-w-7xl ai:px-4 ai:sm:px-6 ai:lg:px-8">
+  <div class="ai:mx-auto ai:max-w-wide ai:px-4 ai:sm:px-6 ai:lg:px-8">
     <?php if ( $heading ) : ?>
     <div class="ai:mx-auto ai:max-w-2xl ai:text-center">
       <h2 class="ai:m-0 ai:text-3xl ai:font-semibold ai:tracking-tight ai:text-balance ai:text-white ai:sm:text-4xl"><?php echo esc_html( $heading ); ?></h2>

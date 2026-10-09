@@ -19,20 +19,20 @@ $base = ai_cls( 'ai:inline-flex ai:size-10 ai:items-center ai:justify-center ai:
 <nav aria-label="Pagination" class="ai-c">
   <ul class="ai:m-0 ai:flex ai:list-none ai:flex-wrap ai:items-center ai:justify-center ai:gap-1 ai:p-0">
     <?php if ( $current > 1 ) : ?>
-    <li class="ai:m-0 ai:p-0"><a href="<?php echo esc_url( $link( $current - 1 ) ); ?>" aria-label="Previous page" class="<?php echo esc_attr( $base . ' ' . ai_cls( 'ai:text-gray-600 ai:hover:bg-gray-100' ) ); ?>"><?php ai_e_icon( 'chevron-left', 5 ); ?></a></li>
+    <li class="ai:m-0 ai:p-0"><a href="<?php echo esc_url( $link( $current - 1 ) ); ?>" aria-label="Previous page" class="<?php echo esc_attr( $base . ' ' . ai_cls( 'ai:text-muted ai:hover:bg-gray-100' ) ); ?>"><?php ai_e_icon( 'chevron-left', 5 ); ?></a></li>
     <?php endif; ?>
     <?php
     $prev = 0;
     foreach ( $pages as $n ) :
 	    if ( $n - $prev > 1 ) :
 		    ?>
-    <li class="ai:m-0 ai:p-0"><span class="ai:inline-flex ai:size-10 ai:items-center ai:justify-center ai:text-sm ai:text-gray-500">&hellip;</span></li>
+    <li class="ai:m-0 ai:p-0"><span class="ai:inline-flex ai:size-10 ai:items-center ai:justify-center ai:text-sm ai:text-subtle">&hellip;</span></li>
 	    <?php endif; ?>
     <li class="ai:m-0 ai:p-0">
       <?php if ( $n === $current ) : ?>
       <span aria-current="page" class="<?php echo esc_attr( $base . ' ' . ai_cls( 'ai:bg-brand-600 ai:text-white' ) ); ?>"><?php echo esc_html( $n ); ?></span>
       <?php else : ?>
-      <a href="<?php echo esc_url( $link( $n ) ); ?>" class="<?php echo esc_attr( $base . ' ' . ai_cls( 'ai:text-gray-700 ai:hover:bg-gray-100' ) ); ?>"><?php echo esc_html( $n ); ?></a>
+      <a href="<?php echo esc_url( $link( $n ) ); ?>" class="<?php echo esc_attr( $base . ' ' . ai_cls( 'ai:text-muted ai:hover:bg-gray-100' ) ); ?>"><?php echo esc_html( $n ); ?></a>
       <?php endif; ?>
     </li>
 	    <?php
@@ -40,7 +40,7 @@ $base = ai_cls( 'ai:inline-flex ai:size-10 ai:items-center ai:justify-center ai:
     endforeach;
     ?>
     <?php if ( $current < $total ) : ?>
-    <li class="ai:m-0 ai:p-0"><a href="<?php echo esc_url( $link( $current + 1 ) ); ?>" aria-label="Next page" class="<?php echo esc_attr( $base . ' ' . ai_cls( 'ai:text-gray-600 ai:hover:bg-gray-100' ) ); ?>"><?php ai_e_icon( 'chevron-right', 5 ); ?></a></li>
+    <li class="ai:m-0 ai:p-0"><a href="<?php echo esc_url( $link( $current + 1 ) ); ?>" aria-label="Next page" class="<?php echo esc_attr( $base . ' ' . ai_cls( 'ai:text-muted ai:hover:bg-gray-100' ) ); ?>"><?php ai_e_icon( 'chevron-right', 5 ); ?></a></li>
     <?php endif; ?>
   </ul>
 </nav>

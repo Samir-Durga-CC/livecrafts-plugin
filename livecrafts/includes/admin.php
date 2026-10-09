@@ -83,6 +83,8 @@ function livecrafts_admin_page() {
 		echo '<input type="hidden" name="action" value="livecrafts_legacy_remove"><button class="button button-link-delete" onclick="return confirm(\'Remove the old overlay now? Visitors will no longer get its styles and texts.\')">Remove the old overlay now</button></form>';
 	}
 
+	livecrafts_templates_admin_section();
+
 	// ---- releases + recent changes
 	echo '<h2 style="margin-top:32px">Releases</h2>';
 	$releases = livecrafts_releases( 10 );

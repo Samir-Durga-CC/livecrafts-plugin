@@ -7,10 +7,10 @@
 $heading = $args['heading'] ?? '';
 $items   = ai_items( $args );
 ?>
-<section class="ai-c bg-white py-12 sm:py-16">
-  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+<section class="ai-c bg-surface py-12 sm:py-16">
+  <div class="mx-auto max-w-wide px-4 sm:px-6 lg:px-8">
     <?php if ( $heading ) : ?>
-    <p class="m-0 text-center text-sm font-semibold text-gray-500"><?php echo esc_html( $heading ); ?></p>
+    <p class="m-0 text-center text-sm font-semibold text-subtle"><?php echo esc_html( $heading ); ?></p>
     <?php endif; ?>
     <ul class="m-0 mt-8 grid list-none grid-cols-2 items-center gap-x-8 gap-y-10 p-0 sm:grid-cols-3 lg:grid-cols-5">
       <?php foreach ( $items as $item ) : ?>

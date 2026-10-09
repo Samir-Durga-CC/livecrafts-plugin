@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AI Components
  * Description: 25 reusable, theme-independent UI components (hero, cards, pricing, FAQ, header, footer and more) as template parts and shortcodes. Works in Elementor, Divi, WPBakery and custom/ACF themes. One brand color variable re-themes everything.
- * Version: 1.1.0
+ * Version: 1.2.0
  * Requires at least: 6.1
  * Requires PHP: 7.4
  * License: GPL-2.0-or-later
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 
 define( 'AI_COMPONENTS_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AI_COMPONENTS_URL', plugin_dir_url( __FILE__ ) );
-define( 'AI_COMPONENTS_VERSION', '1.1.0' );
+define( 'AI_COMPONENTS_VERSION', '1.2.0' );
 
 require_once AI_COMPONENTS_DIR . 'includes/helpers.php';
 
@@ -102,8 +102,11 @@ add_action(
 			add_shortcode(
 				'ai_' . $name,
 				function ( $atts, $content = '' ) use ( $template, $def, $name ) {
-					$atts = shortcode_atts( $def['defaults'], $atts, 'ai_' . $name );
-					$args = array_map( 'sanitize_text_field', $atts );
+					$fit_defaults = array_fill_keys( array_keys( ai_fit_keys() ), '' );
+					$atts         = shortcode_atts( array_merge( $def['defaults'], $fit_defaults ), $atts, 'ai_' . $name );
+					$fit          = array_intersect_key( $atts, $fit_defaults );
+					$args         = array_map( 'sanitize_text_field', array_diff_key( $atts, $fit_defaults ) );
+					$args['fit']  = array_map( 'sanitize_text_field', $fit );
 					if ( $def['items'] ) {
 						$args['items'] = ai_components_parse_items( $content );
 					}

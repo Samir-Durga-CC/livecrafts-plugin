@@ -84,11 +84,55 @@ function ai_initials( $name ) {
 	return $out;
 }
 
+/** "Fit" settings every component accepts: how it adapts to the site it sits in (CSS variable => kind). */
+function ai_fit_keys() {
+	return array(
+		'brand' => array( '--ai-brand', 'color' ), 'surface' => array( '--ai-surface', 'color' ), 'surface_alt' => array( '--ai-surface-alt', 'color' ),
+		'ink' => array( '--ai-ink', 'color' ), 'muted' => array( '--ai-muted', 'color' ), 'line' => array( '--ai-line', 'color' ),
+		'max' => array( '--ai-max', 'length' ), 'py' => array( '--ai-py', 'length' ), 'py_sm' => array( '--ai-py-sm', 'length' ),
+		'radius' => array( '--ai-radius', 'length' ), 'font' => array( '--ai-font', 'font' ),
+	);
+}
+
+/** A value that is safe inside a style attribute, or ''. Colors: hex / rgb / hsl / var(). Lengths: number+unit / clamp() / var(). */
+function ai_css_value( $value, $kind ) {
+	$v = trim( (string) $value );
+	if ( '' === $v || strlen( $v ) > 120 || preg_match( '/[;{}<>\\\\\x22\x27@]|url\(|expression|\/\*/i', $v ) ) {
+		return '';
+	}
+	$num = '-?\d*\.?\d+(?:px|rem|em|%|vw|vh|ch)?';
+	if ( 'color' === $kind ) {
+		return preg_match( '/^(#[0-9a-f]{3,8}|(?:rgb|rgba|hsl|hsla|oklch|color-mix)\([0-9a-z\s.,%\/-]+\)|var\(--[a-z0-9-]+(?:,\s*[#a-z0-9(),.%\s-]+)?\))$/i', $v ) ? $v : '';
+	}
+	if ( 'font' === $kind ) {
+		return preg_match( '/^[a-z0-9 ,\-_]+$/i', $v ) || preg_match( '/^var\(--[a-z0-9-]+\)$/i', $v ) ? $v : '';
+	}
+	return preg_match( '/^(' . $num . '|(?:clamp|min|max|calc)\([0-9a-z\s.,%+*\/()-]+\)|var\(--[a-z0-9-]+\))$/i', $v ) ? $v : '';
+}
+
+/** style="" for a fit array like array( 'max' => '1140px', 'brand' => '#0f766e' ). Unknown keys and unsafe values are dropped. */
+function ai_fit_style( $fit ) {
+	$css = '';
+	foreach ( ai_fit_keys() as $key => $def ) {
+		if ( empty( $fit[ $key ] ) ) {
+			continue;
+		}
+		$val = ai_css_value( $fit[ $key ], $def[1] );
+		if ( '' !== $val ) {
+			$css .= $def[0] . ':' . $val . ';';
+		}
+	}
+	return $css;
+}
+
 /**
  * Render a component by name. Themes may override with ai-components/{name}.php.
  * Used by shortcodes, by other components (hero renders button) and directly from ACF loops.
+ * The outermost call wraps the component in <div class="ai-t" data-lc-template="name"> carrying the "fit" variables
+ * ($args['fit']); that marker proves on the page that the template was used (see ?lc_templates=1 for editors).
  */
 function ai_component( $name, $args = array(), $echo = true ) {
+	static $depth = 0;
 	$name = sanitize_key( $name );
 	$path = locate_template( 'ai-components/' . $name . '.php' );
 	if ( ! $path ) {
@@ -100,9 +144,18 @@ function ai_component( $name, $args = array(), $echo = true ) {
 
 	wp_enqueue_style( 'ai-components' );
 
+	$fit = isset( $args['fit'] ) && is_array( $args['fit'] ) ? $args['fit'] : array();
+	++$depth;
 	ob_start();
 	load_template( $path, false, $args );
 	$html = ob_get_clean();
+	--$depth;
+
+	if ( 0 === $depth ) {
+		do_action( 'ai_component_rendered', $name, $args );
+		$style = ai_fit_style( $fit );
+		$html  = '<div class="ai-t" data-lc-template="' . esc_attr( str_replace( '-', '_', $name ) ) . '" data-lc-tlib="' . esc_attr( AI_COMPONENTS_VERSION ) . '"' . ( $style ? ' style="' . esc_attr( $style ) . '"' : '' ) . '>' . $html . '</div>';
+	}
 
 	if ( $echo ) {
 		echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- every template escapes its own output.

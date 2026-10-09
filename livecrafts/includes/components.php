@@ -43,6 +43,7 @@ function livecrafts_rest_site_profile() {
 			'blocks'    => array( 'patterns' => count( livecrafts_comp_try( 'livecrafts_comp_registered_patterns' ) ) ),
 		),
 		'forms'    => livecrafts_comp_try( 'livecrafts_profile_forms' ),
+		'templates' => livecrafts_comp_try( 'livecrafts_templates_summary', array( 'active' => false ) ),
 	);
 }
 

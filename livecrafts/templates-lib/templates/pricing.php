@@ -9,22 +9,22 @@ $text    = $args['text'] ?? '';
 $items   = ai_items( $args );
 $cols    = count( $items ) >= 3 ? ai_cls( 'ai:lg:grid-cols-3' ) : ai_cls( 'ai:lg:grid-cols-2 ai:lg:max-w-4xl ai:lg:mx-auto' );
 ?>
-<section class="ai-c ai:bg-gray-50 ai:py-16 ai:sm:py-24">
-  <div class="ai:mx-auto ai:max-w-7xl ai:px-4 ai:sm:px-6 ai:lg:px-8">
+<section class="ai-c ai:bg-surface-alt ai:py-sec-sm ai:sm:py-sec">
+  <div class="ai:mx-auto ai:max-w-wide ai:px-4 ai:sm:px-6 ai:lg:px-8">
     <?php if ( $heading ) : ?>
     <div class="ai:mx-auto ai:max-w-2xl ai:text-center">
-      <h2 class="ai:m-0 ai:text-3xl ai:font-semibold ai:tracking-tight ai:text-balance ai:text-gray-900 ai:sm:text-4xl"><?php echo esc_html( $heading ); ?></h2>
-      <?php if ( $text ) : ?><p class="ai:mt-4 ai:mb-0 ai:text-lg ai:text-pretty ai:text-gray-600"><?php echo esc_html( $text ); ?></p><?php endif; ?>
+      <h2 class="ai:m-0 ai:text-3xl ai:font-semibold ai:tracking-tight ai:text-balance ai:text-ink ai:sm:text-4xl"><?php echo esc_html( $heading ); ?></h2>
+      <?php if ( $text ) : ?><p class="ai:mt-4 ai:mb-0 ai:text-lg ai:text-pretty ai:text-muted"><?php echo esc_html( $text ); ?></p><?php endif; ?>
     </div>
     <?php endif; ?>
     <div class="<?php echo esc_attr( ai_cls( 'ai:mt-14 ai:grid ai:items-stretch ai:gap-8' ) . ' ' . $cols ); ?>">
       <?php
       foreach ( $items as $item ) :
 	      $featured = ! empty( $item['featured'] ) && '0' !== (string) $item['featured'];
-	      $card     = $featured ? ai_cls( 'ai:bg-gray-900 ai:ring-gray-900 ai:shadow-xl' ) : ai_cls( 'ai:bg-white ai:ring-gray-200 ai:shadow-sm' );
-	      $name_c   = $featured ? ai_cls( 'ai:text-white' ) : ai_cls( 'ai:text-gray-900' );
-	      $price_c  = $featured ? ai_cls( 'ai:text-white' ) : ai_cls( 'ai:text-gray-900' );
-	      $muted_c  = $featured ? ai_cls( 'ai:text-gray-300' ) : ai_cls( 'ai:text-gray-600' );
+	      $card     = $featured ? ai_cls( 'ai:bg-gray-900 ai:ring-gray-900 ai:shadow-xl' ) : ai_cls( 'ai:bg-surface ai:ring-gray-200 ai:shadow-sm' );
+	      $name_c   = $featured ? ai_cls( 'ai:text-white' ) : ai_cls( 'ai:text-ink' );
+	      $price_c  = $featured ? ai_cls( 'ai:text-white' ) : ai_cls( 'ai:text-ink' );
+	      $muted_c  = $featured ? ai_cls( 'ai:text-gray-300' ) : ai_cls( 'ai:text-muted' );
 	      $check_c  = $featured ? ai_cls( 'ai:text-brand-300' ) : ai_cls( 'ai:text-brand-600' );
 	      ?>
       <div class="<?php echo esc_attr( ai_cls( 'ai:relative ai:flex ai:flex-col ai:rounded-3xl ai:p-8 ai:ring-1 ai:ring-inset' ) . ' ' . $card ); ?>">

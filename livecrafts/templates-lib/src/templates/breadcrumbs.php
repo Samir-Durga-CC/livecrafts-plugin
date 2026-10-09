@@ -12,10 +12,10 @@ $last  = count( $items ) - 1;
     <?php foreach ( $items as $i => $item ) : ?>
     <li class="m-0 flex items-center gap-2 p-0">
       <?php if ( $i < $last && ! empty( $item['url'] ) ) : ?>
-      <a href="<?php echo esc_url( $item['url'] ); ?>" class="font-medium text-gray-600 no-underline hover:text-brand-700"><?php echo esc_html( $item['label'] ?? '' ); ?></a>
+      <a href="<?php echo esc_url( $item['url'] ); ?>" class="font-medium text-muted no-underline hover:text-brand-700"><?php echo esc_html( $item['label'] ?? '' ); ?></a>
       <span class="text-gray-400"><?php ai_e_icon( 'chevron-right', 4 ); ?></span>
       <?php else : ?>
-      <span aria-current="page" class="font-medium text-gray-900"><?php echo esc_html( $item['label'] ?? '' ); ?></span>
+      <span aria-current="page" class="font-medium text-ink"><?php echo esc_html( $item['label'] ?? '' ); ?></span>
       <?php endif; ?>
     </li>
     <?php endforeach; ?>

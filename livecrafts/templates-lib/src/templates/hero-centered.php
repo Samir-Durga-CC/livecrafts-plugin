@@ -9,15 +9,15 @@ $heading = $args['heading'] ?? '';
 $text    = $args['text'] ?? '';
 $note    = $args['note'] ?? '';
 ?>
-<section class="ai-c relative isolate overflow-hidden bg-white">
+<section class="ai-c relative isolate overflow-hidden bg-surface">
   <div class="absolute inset-x-0 top-0 -z-10 h-72 bg-linear-to-b from-brand-50 to-white" aria-hidden="true"></div>
   <div class="mx-auto max-w-4xl px-4 py-20 text-center sm:px-6 sm:py-28 lg:px-8 lg:py-32">
     <?php if ( $eyebrow ) : ?>
-    <p class="mb-6 mt-0 inline-flex items-center rounded-full bg-white px-3 py-1 text-sm font-medium text-brand-700 shadow-sm ring-1 ring-inset ring-brand-200"><?php echo esc_html( $eyebrow ); ?></p>
+    <p class="mb-6 mt-0 inline-flex items-center rounded-full bg-surface px-3 py-1 text-sm font-medium text-brand-700 shadow-sm ring-1 ring-inset ring-brand-200"><?php echo esc_html( $eyebrow ); ?></p>
     <?php endif; ?>
-    <h1 class="m-0 text-4xl font-bold tracking-tight text-balance text-gray-900 sm:text-6xl"><?php echo esc_html( $heading ); ?></h1>
+    <h1 class="m-0 text-4xl font-bold tracking-tight text-balance text-ink sm:text-6xl"><?php echo esc_html( $heading ); ?></h1>
     <?php if ( $text ) : ?>
-    <p class="mx-auto mt-6 mb-0 max-w-2xl text-lg/8 text-pretty text-gray-600"><?php echo esc_html( $text ); ?></p>
+    <p class="mx-auto mt-6 mb-0 max-w-2xl text-lg/8 text-pretty text-muted"><?php echo esc_html( $text ); ?></p>
     <?php endif; ?>
     <div class="mt-10 flex flex-wrap items-center justify-center gap-3">
       <?php
@@ -30,7 +30,7 @@ $note    = $args['note'] ?? '';
       ?>
     </div>
     <?php if ( $note ) : ?>
-    <p class="mt-6 mb-0 text-sm text-gray-500"><?php echo esc_html( $note ); ?></p>
+    <p class="mt-6 mb-0 text-sm text-subtle"><?php echo esc_html( $note ); ?></p>
     <?php endif; ?>
   </div>
 </section>
