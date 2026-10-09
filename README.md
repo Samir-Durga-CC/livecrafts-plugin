@@ -1,4 +1,4 @@
-# Livecrafts (WordPress plugin, 0.10)
+# Livecrafts (WordPress plugin, 0.13)
 
 Edit a live WordPress site with an AI assistant or by clicking on the page - safely:
 
@@ -13,6 +13,64 @@ Edit a live WordPress site with an AI assistant or by clicking on the page - saf
 * **Releases.** Each deploy is a release with notes. The site can be reset to any earlier release or to a baseline
   (e.g. the moment it was handed over to the client).
 * **Notes.** The assistant keeps notes about the site and each page, stored in WordPress.
+
+## Setup (from zero)
+
+This repo is the **WordPress plugin**. It needs the Livecrafts **backend** (repo `livecrafts-backend`, a Node app) to
+power the AI chat - set that up too, its README has the steps. The plugin alone gives you drafts, history and
+releases; the chat and the assistant come from the backend.
+
+### 1. What you need
+| | |
+|---|---|
+| **WordPress 6.2+ and PHP 7.4+** | A site you can log in to as an **administrator**. Try it on a local or staging site first. |
+| **The Livecrafts backend** | Running and reachable from your browser (default `http://127.0.0.1:8790`). |
+| Optional | **Elementor** and/or **ACF** (ACF PRO for repeaters / flexible content). Block-editor (Gutenberg) content and Additional CSS work without them. |
+
+### 2. Get the plugin into WordPress
+The plugin is the `livecrafts/` folder. Pick one:
+
+**A. Upload a zip (easiest).** Build the zip - the folder must be named `livecrafts` inside it:
+```bash
+git archive --format=zip --prefix=livecrafts/ -o livecrafts.zip HEAD:livecrafts
+```
+(or zip the `livecrafts` folder yourself so that `livecrafts/livecrafts.php` is inside the zip). Then in wp-admin:
+**Plugins -> Add New Plugin -> Upload Plugin**, choose `livecrafts.zip`, **Install Now**, **Activate**.
+To update later, upload a new zip and choose *Replace current with uploaded*; raise `LIVECRAFTS_VERSION` in
+`livecrafts/livecrafts.php` first so browsers drop the cached `widget.js`.
+
+**B. Copy the folder.** Copy `livecrafts/` to `wp-content/plugins/livecrafts/` on the site (FTP, file manager, or a
+symlink on a local site), then activate it under **Plugins**.
+
+On activation the plugin creates its own tables (`livecrafts_changes`, `livecrafts_releases`, `livecrafts_snapshots`),
+the capabilities and a secret. Nothing else is needed - there is no `.env` for the plugin.
+
+### 3. Connect it to the backend
+1. **Application Password.** In wp-admin: **Users -> Profile -> Application Passwords**, name it `livecrafts`, click
+   *Add New* and copy the password (shown once). Use an **administrator** account. (On a live site WordPress only
+   offers Application Passwords over HTTPS.)
+2. **Tell the backend about the site.** Open the backend app, sidebar -> **Connect a site**, and enter the site URL, the
+   WordPress username and that Application Password.
+3. **Tell WordPress where the backend is.** **Settings -> Livecrafts Assistant -> Livecrafts backend address**:
+   `http://127.0.0.1:8790` when the backend runs on your own computer, otherwise its public `https://` address.
+   Here you can also set the assistant's name, model and instructions.
+4. **Deploy password (optional).** **Settings -> Livecrafts**: by default deploying asks for the editor's own WordPress
+   password; an administrator can set a separate deploy password here, which then replaces it.
+5. Log in as an editor/admin and open any page of the site: the Livecrafts chat button appears. Ask for a change - it
+   becomes a **draft** only editors see; **Deploy** (password) makes it live.
+
+### 4. Who can do what
+`livecrafts_edit` (make drafts, use the chat) and `livecrafts_deploy` (publish drafts, reset) are WordPress capabilities.
+Administrators have both, Editors get `livecrafts_edit`; give them to other roles with any role-editor plugin.
+
+### Troubleshooting
+| Problem | Fix |
+|---|---|
+| No chat button | You are logged out or have no `livecrafts_edit` capability; or the plugin is inactive. |
+| Chat button opens an empty/failed frame | The backend is not running, or *Livecrafts backend address* is wrong. A site on `https://` needs an `https://` backend (browsers block mixed content). |
+| Backend "Connect a site" fails | Wrong Application Password, the user is not an administrator, the plugin is not active, or REST API / Application Passwords are blocked by a security plugin or the host. |
+| Old widget after an update | Bump `LIVECRAFTS_VERSION` and hard-refresh (Ctrl+F5). |
+| Upgrading from 0.9 | Settings -> Livecrafts shows the old overlay; its styles are moved into a draft CSS block to review. |
 
 ## Files (`livecrafts/`)
 | File | Job |
@@ -55,7 +113,7 @@ Edit a live WordPress site with an AI assistant or by clicking on the page - saf
 | `css.block` | block name | CSS (no `!important`) |
 
 ## Testing
-`tests/integration.php` runs the whole flow against a **local** WordPress (it creates and deletes its own content):
+Needs PHP and a **local** WordPress checkout (never a live site). `tests/integration.php` runs the whole flow against a **local** WordPress (it creates and deletes its own content):
 
 ```bash
 php tests/integration.php "/path/to/wordpress"
