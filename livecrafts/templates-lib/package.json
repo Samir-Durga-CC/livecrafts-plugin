@@ -1,0 +1,16 @@
+{
+  "name": "ai-components",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "python3 tools/prefix.py && tailwindcss -i src/input.css -o assets/css/ai-components.css --minify && python3 tools/check.py && php tools/preview.php"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
+    "tailwindcss": "^4.3.3"
+  }
+}

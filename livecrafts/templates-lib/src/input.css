@@ -1,0 +1,47 @@
+/*
+ * AI Components stylesheet (Tailwind v4)
+ * - prefix(ai): every class is ai:xxx, so nothing clashes with the theme or page builder
+ * - important: utilities beat theme/builder CSS (Elementor, Divi, ...) that would otherwise restyle h2, p, a, ul...
+ * - no global reset: the host site's own look is untouched
+ * - ONE brand variable: set --ai-brand (any CSS color) on :root or any wrapper to re-theme all components
+ */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme) prefix(ai);
+@import "tailwindcss/utilities.css" layer(utilities) prefix(ai) important;
+
+@theme inline {
+  --color-brand-50: color-mix(in oklab, var(--ai-brand, #4f46e5) 7%, white);
+  --color-brand-100: color-mix(in oklab, var(--ai-brand, #4f46e5) 14%, white);
+  --color-brand-200: color-mix(in oklab, var(--ai-brand, #4f46e5) 28%, white);
+  --color-brand-300: color-mix(in oklab, var(--ai-brand, #4f46e5) 50%, white);
+  --color-brand-500: color-mix(in oklab, var(--ai-brand, #4f46e5), white 12%);
+  --color-brand-600: var(--ai-brand, #4f46e5);
+  --color-brand-700: color-mix(in oklab, var(--ai-brand, #4f46e5), black 18%);
+  --color-brand-800: color-mix(in oklab, var(--ai-brand, #4f46e5), black 36%);
+  --color-brand-900: color-mix(in oklab, var(--ai-brand, #4f46e5), black 58%);
+}
+
+/*
+ * Defensive reset, scoped to .ai-c (double class = beats theme rules like ".entry-content h2").
+ * Normal (non-!important) declarations on purpose: every utility is !important, so utilities always win over these.
+ */
+.ai-c.ai-c :is(h1, h2, h3, h4, h5, h6) { margin: 0; padding: 0; border: 0; text-transform: none; letter-spacing: normal; font-style: normal; font-family: inherit; text-shadow: none; background: none; }
+.ai-c.ai-c :is(p, dl, dt, dd, figure, figcaption, blockquote, details, summary) { margin: 0; padding: 0; text-transform: none; letter-spacing: normal; font-style: normal; text-shadow: none; text-indent: 0; }
+.ai-c.ai-c blockquote { border: 0; quotes: none; }
+.ai-c.ai-c :is(ul, ol) { margin: 0; padding: 0; list-style: none; }
+.ai-c.ai-c li { margin: 0; padding: 0; list-style: none; }
+.ai-c.ai-c a, a.ai-c.ai-c { text-decoration: none; border: 0; box-shadow: none; color: inherit; background-image: none; }
+.ai-c.ai-c img { border: 0; padding: 0; box-shadow: none; }
+.ai-c.ai-c svg { fill: none; }
+.ai-c.ai-c :is(input, textarea, button, select) { font-family: inherit; text-transform: none; letter-spacing: normal; margin: 0; }
+.ai-c.ai-c :is(input, textarea) { border: 0; }
+
+/* Minimal safety net for things utilities do not cover. */
+.ai-c, .ai-c *, .ai-c *::before, .ai-c *::after { box-sizing: border-box; }
+.ai-c { font-family: var(--ai-font, inherit); line-height: 1.5; }
+.ai-c details > summary { list-style: none; }
+.ai-c details > summary::-webkit-details-marker { display: none; }
+
+@source "../templates";
+@source "../includes";
+@source inline("ai:{size-3,size-4,size-5,size-6,size-8}");
