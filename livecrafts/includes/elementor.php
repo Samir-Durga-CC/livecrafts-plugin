@@ -317,7 +317,7 @@ function livecrafts_el_value( array $control, $value, $current, $name ) {
 		case 'text':
 		case 'textarea':
 			if ( ! is_scalar( $value ) ) return livecrafts_bad_value( 'This setting is text.' );
-			if ( $name === '_css_classes' || substr( $name, -12 ) === '_css_classes' ) return trim( preg_replace( '/[^A-Za-z0-9 _-]/', '', (string) $value ) );
+			if ( $name === 'css_classes' || $name === '_css_classes' || substr( $name, -12 ) === '_css_classes' ) return trim( preg_replace( '/[^A-Za-z0-9 _-]/', '', (string) $value ) );
 			if ( $name === '_element_id' ) return sanitize_html_class( (string) $value );
 			return wp_kses_post( (string) $value );
 		case 'wysiwyg':

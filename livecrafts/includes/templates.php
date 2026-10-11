@@ -166,6 +166,53 @@ function livecrafts_templates_summary() {
 	);
 }
 
+/* ------------------------------------------------------------------ contact form handler */
+
+/**
+ * The contact_form template is markup only. This is the handler it posts to when no other form plugin is used:
+ * admin-post.php?action=livecrafts_contact. Sends the message to the address in Settings > General (or the
+ * livecrafts_contact_to option), checks the form came from this site, and allows 5 messages per visitor per 10 minutes.
+ */
+function livecrafts_contact_action_url() {
+	return admin_url( 'admin-post.php?action=livecrafts_contact' );
+}
+
+function livecrafts_handle_contact() {
+	$back = wp_get_referer();
+	$home = wp_parse_url( home_url(), PHP_URL_HOST );
+	if ( ! $back || wp_parse_url( $back, PHP_URL_HOST ) !== $home ) $back = home_url( '/' );
+	$back = remove_query_arg( array( 'lc_sent', 'lc_error' ), $back );
+	if ( 'POST' !== ( isset( $_SERVER['REQUEST_METHOD'] ) ? $_SERVER['REQUEST_METHOD'] : '' ) ) wp_safe_redirect( $back ) && exit;
+	$ip   = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
+	$key  = 'lc_contact_' . md5( $ip );
+	$sent = (int) get_transient( $key );
+	$name = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification -- public form, protected by origin check + rate limit
+	$mail = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
+	$msg  = isset( $_POST['message'] ) ? sanitize_textarea_field( wp_unslash( $_POST['message'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
+	if ( $sent >= 5 ) { wp_safe_redirect( add_query_arg( 'lc_error', 'rate', $back ) ); exit; }
+	if ( ! $name || ! is_email( $mail ) || ! $msg ) { wp_safe_redirect( add_query_arg( 'lc_error', 'fields', $back ) ); exit; }
+	$to      = sanitize_email( (string) get_option( 'livecrafts_contact_to', '' ) );
+	if ( ! $to ) $to = get_option( 'admin_email' );
+	$subject = sprintf( '[%s] New message from %s', wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES ), $name );
+	$ok      = wp_mail( $to, $subject, "Name: $name
+Email: $mail
+
+$msg", array( 'Reply-To: ' . $name . ' <' . $mail . '>' ) );
+	set_transient( $key, $sent + 1, 10 * MINUTE_IN_SECONDS );
+	wp_safe_redirect( add_query_arg( $ok ? 'lc_sent' : 'lc_error', $ok ? '1' : 'mail', $back ) );
+	exit;
+}
+add_action( 'admin_post_nopriv_livecrafts_contact', 'livecrafts_handle_contact' );
+add_action( 'admin_post_livecrafts_contact', 'livecrafts_handle_contact' );
+
+/** A visible answer after the redirect (the template has no place for one): a small notice on top of the page. */
+add_action( 'wp_footer', function () {
+	if ( ! isset( $_GET['lc_sent'] ) && ! isset( $_GET['lc_error'] ) ) return; // phpcs:ignore WordPress.Security.NonceVerification -- display only
+	$ok  = isset( $_GET['lc_sent'] ); // phpcs:ignore WordPress.Security.NonceVerification
+	$msg = $ok ? 'Thank you - your message was sent.' : 'Sorry, your message could not be sent. Please check every field and try again.';
+	echo '<div role="status" style="position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:99999;max-width:90vw;padding:14px 20px;border-radius:8px;color:#fff;font:600 15px/1.4 system-ui,sans-serif;background:' . ( $ok ? '#15803d' : '#b91c1c' ) . '">' . esc_html( $msg ) . '</div>';
+} );
+
 /* ------------------------------------------------------------------ REST */
 
 add_action( 'rest_api_init', function () {
@@ -185,7 +232,7 @@ function livecrafts_rest_templates() {
 	}
 	unset( $c );
 	return array(
-		'ok' => true, 'active' => true, 'version' => AI_COMPONENTS_VERSION,
+		'ok' => true, 'active' => true, 'version' => AI_COMPONENTS_VERSION, 'contactAction' => livecrafts_contact_action_url(),
 		'fitKeys' => array_keys( ai_fit_keys() ), 'fit' => livecrafts_template_fit(),
 		'howToCheck' => 'Open any page as an editor with ?lc_templates=1: every template section is outlined and labelled.',
 		'components' => array_values( $cat ),
