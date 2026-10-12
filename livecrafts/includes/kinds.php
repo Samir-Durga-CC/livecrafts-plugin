@@ -150,6 +150,9 @@ function livecrafts_kinds() {
 		'block.remove'    => livecrafts_block_kind( 'remove' ),
 		'block.move'      => livecrafts_block_kind( 'move' ),
 		'block.duplicate' => livecrafts_block_kind( 'duplicate' ),
+		// Text and links inside the modules of a Divi page (divi.php). Target: "<path>:<field>".
+		'divi.text' => livecrafts_divi_kind( 'text' ),
+		'divi.link' => livecrafts_divi_kind( 'link' ),
 		// Put a whole object back to a recorded state (revert of a change made outside Livecrafts, or of a reset).
 		'object.restore' => array(
 			'object'  => 'any',

@@ -182,12 +182,22 @@
 	function resolve(snap) {
 		return wp("POST", "resolve", {
 			page: Number(C.postId) || 0, device: deviceOf(window.innerWidth), elementor: snap.elementor ? { doc: snap.elementor.post, id: snap.elementor.id } : null,
-			block: snap.block || "", menuItem: snap.menuItem || 0, tag: snap.tag, text: snap.rawText || snap.text,
+			block: snap.block || "", divi: snap.divi || "", menuItem: snap.menuItem || 0, tag: snap.tag, text: snap.rawText || snap.text,
 			imageSrc: snap.image ? snap.image.src : "", bgImage: snap.bgImage || "", href: snap.link || "", selector: snap.selector,
 		});
 	}
 	/** The block of the page content this element belongs to ("<post>:<path>", only on pages Livecrafts marked for editors). */
 	function blockOf(el) { var b = el.closest && el.closest("[data-lc-block]"); return b ? b.getAttribute("data-lc-block") : ""; }
+	/**
+	 * The Divi module this element belongs to ("<post>:<path>"). Divi has no id of its own on the page, so for editors
+	 * Livecrafts gives every module the class lcd-<path with dashes> (see divi.php). The NEAREST one wins, so a click
+	 * inside a Text module finds that module and not the row or section around it.
+	 */
+	function diviOf(el) {
+		var d = el.closest && el.closest("[class*='lcd-']");
+		var m = d && /(?:^|\s)lcd-(\d+(?:-\d+)*)(?:\s|$)/.exec(d.className || "");
+		return m ? (Number(C.postId) || 0) + ":" + m[1].split("-").join(".") : "";
+	}
 	/** The classic menu link this element belongs to (WordPress puts menu-item-<id> on each item). */
 	function menuItemOf(el) {
 		var li = el.closest && el.closest("li[class*='menu-item-']");
@@ -225,7 +235,7 @@
 			link: el.closest && el.closest("a") ? el.closest("a").href : "",
 			styles: styles, rect: { width: Math.round(r.width), height: Math.round(r.height) },
 			section: sectionOf(el), pageUrl: location.href.split("#")[0].replace(/[?&]lcv=\d+/, ""), viewport: window.innerWidth,
-			pageKey: C.pageKey || "", elementor: elementorOf(el), hasChildren: hasMarkup(el), block: blockOf(el), menuItem: menuItemOf(el),
+			pageKey: C.pageKey || "", elementor: elementorOf(el), hasChildren: hasMarkup(el), block: blockOf(el), divi: diviOf(el), menuItem: menuItemOf(el),
 			similarSelector: similar.selector, similarCount: similar.count,
 		};
 	}

@@ -31,6 +31,10 @@ function livecrafts_parse_target( $id ) {
 	if ( preg_match( '/^el:(\d+):([A-Za-z0-9]{3,16}):([a-z_]+(?:\.[a-z_]+)?)$/', (string) $id, $m ) ) {
 		return array( 'type' => 'el', 'post' => (int) $m[1], 'id' => $m[2], 'path' => $m[3] );
 	}
+	// Divi module field:  divi:<post>:<path>:<field>
+	if ( preg_match( '/^divi:(\d+):(\d{1,4}(?:\.\d{1,4}){0,9}):([a-z][a-z0-9_]{0,39})$/', (string) $id, $m ) ) {
+		return array( 'type' => 'divi', 'post' => (int) $m[1], 'path' => $m[2], 'field' => $m[3] );
+	}
 	return null;
 }
 

@@ -33,6 +33,7 @@ function livecrafts_rest_ping() {
 		'capabilities' => array(
 			'acf'         => livecrafts_acf_active(),
 			'elementor'   => livecrafts_el_active(),
+			'divi'        => livecrafts_divi_active(),
 			'drafts'      => true,
 			'kinds'       => array_keys( livecrafts_kinds() ),
 			'theme_files' => current_user_can( 'edit_themes' ),
@@ -69,17 +70,21 @@ function livecrafts_rest_map( WP_REST_Request $req ) {
 	$view = $req->get_param( 'view' ) === 'live' ? 'live' : 'draft';
 	$data = $view === 'live' ? livecrafts_post_data( $post ) : livecrafts_draft_data( 'post', $post );
 	if ( is_wp_error( $data ) ) return $data;
-	$acf = livecrafts_acf_scan( $post, $data );
-	$el  = livecrafts_el_scan( $post, $data );
+	$acf  = livecrafts_acf_scan( $post, $data );
+	$el   = livecrafts_el_scan( $post, $data );
+	$divi = livecrafts_divi_scan( $post, $data );
 	return array(
 		'ok'        => true,
 		'view'      => $view,
 		'post'      => array( 'id' => $post, 'type' => get_post_type( $post ), 'title' => $data['fields']['title'], 'status' => get_post_status( $post ), 'url' => get_permalink( $post ), 'edit_link' => get_edit_post_link( $post, 'raw' ) ),
-		'builders'  => array( 'elementor' => ! empty( $data['meta']['_elementor_data'] ), 'acf_fields' => count( $acf ), 'elementor_settings' => count( $el ) ),
+		'builders'  => array( 'elementor' => ! empty( $data['meta']['_elementor_data'] ), 'acf_fields' => count( $acf ), 'elementor_settings' => count( $el ),
+			'divi' => livecrafts_divi_has( $data['fields']['content'] ), 'divi_fields' => count( $divi ) ),
 		'acf'       => $acf,
 		'elementor' => $el,
 		'elementor_outline' => livecrafts_el_outline( livecrafts_el_tree( $data ) ),
+		'divi'         => $divi,
+		'divi_outline' => livecrafts_divi_outline( $data['fields']['content'] ),
 		'drafts'    => count( livecrafts_draft_changes( 'post', $post ) ),
-		'note'      => 'Each entry has a stable target id (tid). Change it with POST /changes (kind acf.field target <field key>, or kind el.setting target <element id>:<setting>). Text not listed here is not in ACF/Elementor (it may be block content, a menu, a widget or the theme).',
+		'note'      => 'Each entry has a stable target id (tid). Change it with POST /changes (kind acf.field target <field key>, kind el.setting target <element id>:<setting>, or kind divi.text / divi.link target <path>:<field> - each divi entry carries the exact kind in "change" and target in "target"). Text not listed here is not in ACF/Elementor/Divi (it may be block content, a menu, a widget or the theme).',
 	);
 }

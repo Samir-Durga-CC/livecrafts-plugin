@@ -11,7 +11,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'LIVECRAFTS_VERSION', '0.14.2' );
+define( 'LIVECRAFTS_VERSION', '0.15.1' );
 define( 'LIVECRAFTS_FILE', __FILE__ );
 define( 'LIVECRAFTS_DIR', plugin_dir_path( __FILE__ ) );
 define( 'LIVECRAFTS_URL', plugin_dir_url( __FILE__ ) );
@@ -24,6 +24,7 @@ require_once LIVECRAFTS_DIR . 'includes/targets.php';
 require_once LIVECRAFTS_DIR . 'includes/elementor.php';
 require_once LIVECRAFTS_DIR . 'includes/css.php';
 require_once LIVECRAFTS_DIR . 'includes/blocks.php';
+require_once LIVECRAFTS_DIR . 'includes/divi.php';
 require_once LIVECRAFTS_DIR . 'includes/kinds.php';
 require_once LIVECRAFTS_DIR . 'includes/drafts.php';
 require_once LIVECRAFTS_DIR . 'includes/preview.php';

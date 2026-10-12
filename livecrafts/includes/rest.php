@@ -270,6 +270,19 @@ function livecrafts_rest_debug_target( WP_REST_Request $req ) {
 		$out    = array( 'kind' => 'elementor', 'found' => $d['found'], 'widget' => $d['type'], 'setting' => $t['path'], 'draft_value' => $d['value'], 'live_value' => $l['value'],
 			'where_stored' => 'wp_postmeta "_elementor_data" (one JSON tree for the whole page) of post ' . $t['post'] );
 		if ( is_array( $d['value'] ) && ! empty( $d['value']['id'] ) ) $out['attachment'] = livecrafts_attachment_info( $d['value']['id'] );
+	} elseif ( $t['type'] === 'divi' ) {
+		$read   = function ( $data ) use ( $t ) {
+			$content = (string) $data['fields']['content'];
+			$node    = livecrafts_divi_get( livecrafts_divi_tree( $content ), $t['path'] );
+			return $node ? livecrafts_divi_field_value( $content, $node, $t['field'] ) : '';
+		};
+		$node   = livecrafts_divi_get( livecrafts_divi_tree( (string) $draft['fields']['content'] ), $t['path'] );
+		if ( ! $node ) return new WP_Error( 'livecrafts_no_module', 'There is no Divi module at ' . $t['path'] . ' on this page.', array( 'status' => 404 ) );
+		$kind   = in_array( $t['field'], livecrafts_divi_fields_for( 'link', $node ), true ) ? 'divi.link' : 'divi.text';
+		$target = $t['path'] . ':' . $t['field'];
+		$out    = array( 'kind' => 'divi', 'module' => $node['tag'], 'label' => livecrafts_divi_label( $node ), 'path' => $t['path'], 'field' => $t['field'],
+			'change_kind' => $kind, 'change_target' => $target, 'draft_value' => $read( $draft ), 'live_value' => $read( $live ),
+			'where_stored' => 'the Divi shortcode at path ' . $t['path'] . ' in post_content of post ' . $t['post'] );
 	} elseif ( $t['type'] === 'acfv' ) {
 		$kind   = 'acf.value';
 		$target = $t['name'];
