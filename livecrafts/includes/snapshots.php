@@ -19,10 +19,22 @@ function livecrafts_meta_tracked( $key ) {
 		'_wp_trash_meta_status', '_wp_trash_meta_time', '_wp_trash_meta_comments_status',
 		'_elementor_css', '_elementor_element_cache', '_elementor_page_assets', '_elementor_controls_usage',
 		'_elementor_screenshot', '_elementor_screenshot_failed',
+		'et_enqueued_post_fonts', // Divi writes it while rendering; it is not page content
 	);
 	$key = (string) $key;
 	if ( $key === '' || in_array( $key, $skip, true ) ) return false;
 	if ( strpos( $key, '_livecrafts' ) === 0 || strpos( $key, '_oembed_' ) === 0 ) return false;
+	/**
+	 * Divi 5 caches what a page needs per post and reads it back through getters that DECLARE an array return,
+	 * e.g. DynamicAssetsCache::metadata_get(): array, which does
+	 *     metadata_exists( 'post', $post, $key ) ? get_post_meta( $post, $key, true ) : []
+	 * Both calls go through the get_post_metadata filter, and preview.php answers a tracked key the preview copy
+	 * does not have with array( '' ): metadata_exists() then sees a non-empty array and says yes, while the value
+	 * arrives as '' - a string where Divi promised an array, which is a fatal on every front-end view. These keys
+	 * are a render cache Divi rebuilds by itself, so the preview must never stand in for them (same reason the
+	 * _elementor_* caches are skipped above).
+	 */
+	if ( strpos( $key, '_divi_dynamic_assets' ) === 0 || strpos( $key, '_et_dynamic_' ) === 0 ) return false;
 	return true;
 }
 

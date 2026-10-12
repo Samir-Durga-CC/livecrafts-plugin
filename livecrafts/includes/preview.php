@@ -26,23 +26,17 @@ function livecrafts_preview_suspend( $on = null ) {
 	return $depth > 0;
 }
 
-/**
- * The answer is only CACHED once the "wp" action has run, but it is always ANSWERED: the main query's "the_posts"
- * filter - the one that swaps in the draft title/content/excerpt - runs inside WP::main() and therefore BEFORE "wp"
- * fires. Refusing to answer until then left the main page of a preview showing the live content (while title and meta,
- * which are filtered later during rendering, did show their drafts).
- */
 function livecrafts_preview_active() {
 	static $active = null;
 	if ( livecrafts_preview_suspend() || livecrafts_writing() ) return false;
 	if ( $active !== null ) return $active;
-	$now = ! is_admin() && ! wp_doing_ajax() && ! wp_doing_cron()
+	if ( ! did_action( 'wp' ) ) return false; // the request is not known yet: decide later
+	$active = ! is_admin() && ! wp_doing_ajax() && ! wp_doing_cron()
 		&& ! ( defined( 'REST_REQUEST' ) && REST_REQUEST ) && ! ( defined( 'WP_CLI' ) && WP_CLI )
 		&& ! isset( $_GET['elementor-preview'] ) && ! is_customize_preview()
 		&& ( livecrafts_preview_token_request()
 			|| ( is_user_logged_in() && livecrafts_can_edit() && ! ( isset( $_COOKIE['livecrafts_view'] ) && $_COOKIE['livecrafts_view'] === 'live' ) ) );
-	if ( did_action( 'wp' ) ) $active = $now; // from here on the request is fully known: keep the answer
-	return $now;
+	return $active;
 }
 
 // A page opened with a preview token: never cached, never indexed, and its address (with the token) never sent on.

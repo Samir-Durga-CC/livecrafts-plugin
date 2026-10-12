@@ -11,7 +11,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'LIVECRAFTS_VERSION', '0.15.1' );
+define( 'LIVECRAFTS_VERSION', '0.15.2' );
 define( 'LIVECRAFTS_FILE', __FILE__ );
 define( 'LIVECRAFTS_DIR', plugin_dir_path( __FILE__ ) );
 define( 'LIVECRAFTS_URL', plugin_dir_url( __FILE__ ) );
