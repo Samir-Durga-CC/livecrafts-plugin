@@ -10,7 +10,8 @@
  *   POST changes                    make a draft change {kind, post, target, value, label?, ref?, source?}
  *   POST changes/<id>/revert        drop a draft change / put a live change's old value back as a draft
  *   POST drafts/discard             drop every draft (or ?post=); without ?post= also puts back theme files edited since the last release
- *   POST pages                      new page/post as a draft {title, content?, type?, slug?, parent?, template?}
+ *   POST pages                      new page/post as a draft {title, content?, type?, slug?, parent?, template?, excerpt?,
+ *                                   featured_media?, categories?, tags? (names or ids), meta_description?}
  *   GET  post                       title/content/excerpt/status of a page as editors see it (?id=&view=draft|live)
  *   GET  deploy/check               what a deploy would do, conflicts included (nothing is written)
  *   POST deploy                     livecrafts_deploy + password {password, notes, force?, ids?}

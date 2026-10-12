@@ -242,9 +242,31 @@ function livecrafts_page_create( array $a, array $opts = array() ) {
 	);
 	if ( ! empty( $a['slug'] ) )   $arr['post_name']   = sanitize_title( $a['slug'] );
 	if ( ! empty( $a['parent'] ) ) $arr['post_parent'] = (int) $a['parent'];
+
+	// Blog posts: featured image, categories / tags and the SEO description are set on the new post itself. It is a
+	// WordPress draft (no visitor sees it), so they need no draft changes of their own: deploy publishes them with it,
+	// discarding moves all of it to the Trash.
+	$image = isset( $a['featured_media'] ) ? absint( $a['featured_media'] ) : 0;
+	if ( $image && ! wp_attachment_is_image( $image ) ) return livecrafts_bad_value( 'The featured image is not an image from the Media Library.' );
+	$terms = array();
+	if ( $type === 'post' ) {
+		foreach ( array( 'category' => 'categories', 'post_tag' => 'tags' ) as $tax => $key ) {
+			if ( ! isset( $a[ $key ] ) ) continue;
+			$r = livecrafts_terms_resolve( $tax, (array) $a[ $key ], $actor );
+			if ( is_wp_error( $r ) ) return $r;
+			$terms[ $tax ] = $r;
+		}
+	}
+	$description = isset( $a['meta_description'] ) ? livecrafts_seo_description_clean( $a['meta_description'] ) : '';
+
 	livecrafts_writing( true );
 	$id = wp_insert_post( wp_slash( $arr ), true );
-	if ( ! is_wp_error( $id ) && ! empty( $a['template'] ) ) update_post_meta( $id, '_wp_page_template', sanitize_text_field( $a['template'] ) );
+	if ( ! is_wp_error( $id ) ) {
+		if ( ! empty( $a['template'] ) ) update_post_meta( $id, '_wp_page_template', sanitize_text_field( $a['template'] ) );
+		if ( $image ) set_post_thumbnail( $id, $image );
+		foreach ( $terms as $tax => $r ) wp_set_object_terms( $id, $r['ids'], $tax );
+		if ( $description !== '' ) update_post_meta( $id, livecrafts_seo_meta_key(), $description );
+	}
 	livecrafts_writing( false );
 	if ( is_wp_error( $id ) ) return $id;
 
@@ -254,7 +276,46 @@ function livecrafts_page_create( array $a, array $opts = array() ) {
 		'summary' => 'New ' . $type . ' “' . $title . '”', 'payload' => array( 'type' => $type, 'title' => $title ),
 		'ref' => isset( $opts['ref'] ) ? $opts['ref'] : '',
 	) );
-	return array( 'ok' => true, 'id' => (int) $id, 'preview' => get_preview_post_link( $id ), 'change' => livecrafts_change_public( livecrafts_change_get( $cid ) ) );
+	$out = array( 'ok' => true, 'id' => (int) $id, 'preview' => get_preview_post_link( $id ), 'change' => livecrafts_change_public( livecrafts_change_get( $cid ) ) );
+	if ( $image ) $out['featured_media'] = array( 'id' => $image, 'url' => wp_get_attachment_url( $image ), 'alt' => (string) get_post_meta( $image, '_wp_attachment_image_alt', true ) );
+	foreach ( $terms as $tax => $r ) $out[ $tax === 'category' ? 'categories' : 'tags' ] = $r['used'];
+	if ( $description !== '' ) $out['seo'] = array( 'plugin' => livecrafts_seo_plugin(), 'meta_key' => livecrafts_seo_meta_key(), 'description' => $description );
+	return $out;
+}
+
+/**
+ * Category / tag names (or ids) -> term ids. Existing terms are matched by name or slug, ignoring case, so
+ * "seo tips" reuses "SEO Tips". Missing ones are created when the person may manage that taxonomy.
+ * Returns array( 'ids' => int[], 'used' => array( array( id, name, created ) ) ) or WP_Error.
+ */
+function livecrafts_terms_resolve( $taxonomy, array $wanted, $actor ) {
+	$tax  = get_taxonomy( $taxonomy );
+	$ids  = array();
+	$used = array();
+	foreach ( array_slice( $wanted, 0, 15 ) as $w ) {
+		if ( is_numeric( $w ) ) {
+			$t = get_term( (int) $w, $taxonomy );
+			if ( ! $t || is_wp_error( $t ) ) return livecrafts_bad_value( 'Unknown ' . $tax->labels->singular_name . ' id ' . (int) $w . '.' );
+		} else {
+			$name = trim( sanitize_text_field( (string) $w ) );
+			if ( $name === '' ) continue;
+			$t = get_term_by( 'name', $name, $taxonomy );
+			if ( ! $t ) $t = get_term_by( 'slug', sanitize_title( $name ), $taxonomy );
+			if ( ! $t ) {
+				if ( ! current_user_can( $tax->cap->edit_terms ) || ! user_can( $actor, $tax->cap->edit_terms ) ) {
+					return new WP_Error( 'livecrafts_forbidden', 'You cannot add new ' . strtolower( $tax->labels->name ) . ' (“' . $name . '”). Pick existing ones.', array( 'status' => 403 ) );
+				}
+				$r = wp_insert_term( $name, $taxonomy );
+				if ( is_wp_error( $r ) ) return $r;
+				$t = get_term( $r['term_id'], $taxonomy );
+				$t->livecrafts_created = true;
+			}
+		}
+		if ( in_array( (int) $t->term_id, $ids, true ) ) continue;
+		$ids[]  = (int) $t->term_id;
+		$used[] = array( 'id' => (int) $t->term_id, 'name' => $t->name, 'created' => ! empty( $t->livecrafts_created ) );
+	}
+	return array( 'ids' => $ids, 'used' => $used );
 }
 
 /**
