@@ -11,7 +11,9 @@
  *   POST changes/<id>/revert        drop a draft change / put a live change's old value back as a draft
  *   POST drafts/discard             drop every draft (or ?post=); without ?post= also puts back theme files edited since the last release
  *   POST pages                      new page/post as a draft {title, content?, type?, slug?, parent?, template?, excerpt?,
- *                                   featured_media?, categories?, tags? (names or ids), meta_description?}
+ *                                   featured_media?, categories?, tags? (names or ids), meta_description?,
+ *                                   create_terms? (new category / tag names the person agreed to add; others -> 409)}
+ *   POST post-terms                 categories / tags of a new, not yet deployed post {post, categories?, tags?, create_terms?}
  *   GET  post                       title/content/excerpt/status of a page as editors see it (?id=&view=draft|live)
  *   GET  deploy/check               what a deploy would do, conflicts included (nothing is written)
  *   POST deploy                     livecrafts_deploy + password {password, notes, force?, ids?}
@@ -48,6 +50,7 @@ add_action( 'rest_api_init', function () {
 	$route( '/drafts/discard', 'POST', 'livecrafts_rest_discard' );
 	$route( '/pages', 'POST', 'livecrafts_rest_page_create' );
 	$route( '/post', 'GET', 'livecrafts_rest_post' );
+	$route( '/post-terms', 'POST', 'livecrafts_rest_post_terms' );
 	$route( '/deploy/check', 'GET', 'livecrafts_rest_deploy_check' );
 	$route( '/deploy', 'POST', 'livecrafts_rest_deploy', 'livecrafts_rest_deploy_permission' );
 	$route( '/releases', 'GET', 'livecrafts_rest_releases' );
@@ -175,6 +178,10 @@ function livecrafts_rest_discard( WP_REST_Request $req ) {
 
 function livecrafts_rest_page_create( WP_REST_Request $req ) {
 	return livecrafts_page_create( $req->get_params(), livecrafts_rest_change_opts( $req ) );
+}
+
+function livecrafts_rest_post_terms( WP_REST_Request $req ) {
+	return livecrafts_post_terms_set( (int) $req->get_param( 'post' ), $req->get_params(), livecrafts_rest_change_opts( $req ) );
 }
 
 function livecrafts_rest_post( WP_REST_Request $req ) {

@@ -248,15 +248,8 @@ function livecrafts_page_create( array $a, array $opts = array() ) {
 	// discarding moves all of it to the Trash.
 	$image = isset( $a['featured_media'] ) ? absint( $a['featured_media'] ) : 0;
 	if ( $image && ! wp_attachment_is_image( $image ) ) return livecrafts_bad_value( 'The featured image is not an image from the Media Library.' );
-	$terms = array();
-	if ( $type === 'post' ) {
-		foreach ( array( 'category' => 'categories', 'post_tag' => 'tags' ) as $tax => $key ) {
-			if ( ! isset( $a[ $key ] ) ) continue;
-			$r = livecrafts_terms_resolve( $tax, (array) $a[ $key ], $actor );
-			if ( is_wp_error( $r ) ) return $r;
-			$terms[ $tax ] = $r;
-		}
-	}
+	$terms = $type === 'post' ? livecrafts_post_terms_prepare( $a, $actor ) : array();
+	if ( is_wp_error( $terms ) ) return $terms;
 	$description = isset( $a['meta_description'] ) ? livecrafts_seo_description_clean( $a['meta_description'] ) : '';
 
 	livecrafts_writing( true );
@@ -284,8 +277,73 @@ function livecrafts_page_create( array $a, array $opts = array() ) {
 }
 
 /**
+ * Categories / tags of a blog post from $a['categories'] / $a['tags']. Existing ones are used as they are; a NEW one
+ * is only created when it is listed in $a['create_terms'] (the person agreed to add it). Otherwise nothing is
+ * written and the error names what is missing. Returns array( taxonomy => resolved ) or WP_Error.
+ */
+function livecrafts_post_terms_prepare( array $a, $actor ) {
+	$may_create = array_map( 'mb_strtolower', array_map( 'trim', array_map( 'strval', isset( $a['create_terms'] ) ? (array) $a['create_terms'] : array() ) ) );
+	$missing    = array();
+	foreach ( array( 'category' => 'categories', 'post_tag' => 'tags' ) as $tax => $key ) {
+		if ( ! isset( $a[ $key ] ) ) continue;
+		foreach ( livecrafts_terms_missing( $tax, (array) $a[ $key ] ) as $name ) {
+			if ( ! in_array( mb_strtolower( $name ), $may_create, true ) ) $missing[ $key ][] = $name;
+		}
+	}
+	if ( $missing ) {
+		$list = array();
+		foreach ( $missing as $key => $names ) $list[] = $key . ': ' . implode( ', ', $names );
+		return new WP_Error( 'livecrafts_new_terms', 'These do not exist on the site yet: ' . implode( '; ', $list ) . '. Ask the person whether to add them (then pass them in create_terms), or use existing ones.', array( 'status' => 409, 'missing' => $missing ) );
+	}
+	$terms = array();
+	foreach ( array( 'category' => 'categories', 'post_tag' => 'tags' ) as $tax => $key ) {
+		if ( ! isset( $a[ $key ] ) ) continue;
+		$r = livecrafts_terms_resolve( $tax, (array) $a[ $key ], $actor );
+		if ( is_wp_error( $r ) ) return $r;
+		$terms[ $tax ] = $r;
+	}
+	return $terms;
+}
+
+/**
+ * Change the categories / tags of a blog post Livecrafts created that was never deployed (a WordPress draft nobody
+ * else sees). $a: categories?, tags? (replace the current ones), create_terms?. Published posts: WP admin.
+ */
+function livecrafts_post_terms_set( $post_id, array $a, array $opts = array() ) {
+	global $wpdb;
+	$actor = isset( $opts['actor'] ) ? (int) $opts['actor'] : get_current_user_id();
+	$post  = get_post( $post_id );
+	if ( ! $post || $post->post_type !== 'post' ) return new WP_Error( 'livecrafts_no_page', 'That blog post does not exist.', array( 'status' => 404 ) );
+	if ( ! current_user_can( 'edit_post', $post->ID ) || ! user_can( $actor, 'edit_post', $post->ID ) ) return new WP_Error( 'livecrafts_forbidden', 'You cannot edit this post.', array( 'status' => 403 ) );
+	$new = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . livecrafts_table( 'changes' ) . " WHERE kind = 'post.create' AND status = 'draft' AND object_type = 'post' AND object_id = %d", $post->ID ) );
+	if ( ! $new || $post->post_status !== 'draft' ) {
+		return new WP_Error( 'livecrafts_published', 'Categories and tags can be changed here only for a new post that was not deployed yet. For this post change them in WP admin (Posts → Edit).', array( 'status' => 409 ) );
+	}
+	$terms = livecrafts_post_terms_prepare( $a, $actor );
+	if ( is_wp_error( $terms ) ) return $terms;
+	livecrafts_writing( true );
+	foreach ( $terms as $tax => $r ) wp_set_object_terms( $post->ID, $r['ids'], $tax );
+	livecrafts_writing( false );
+	$out = array( 'ok' => true, 'id' => (int) $post->ID );
+	foreach ( $terms as $tax => $r ) $out[ $tax === 'category' ? 'categories' : 'tags' ] = $r['used'];
+	return $out;
+}
+
+/** The names in $wanted that are not a category / tag of the site yet (matched like livecrafts_terms_resolve). */
+function livecrafts_terms_missing( $taxonomy, array $wanted ) {
+	$out = array();
+	foreach ( array_slice( $wanted, 0, 15 ) as $w ) {
+		if ( is_numeric( $w ) ) continue;
+		$name = trim( sanitize_text_field( (string) $w ) );
+		if ( $name !== '' && ! get_term_by( 'name', $name, $taxonomy ) && ! get_term_by( 'slug', sanitize_title( $name ), $taxonomy ) ) $out[] = $name;
+	}
+	return $out;
+}
+
+/**
  * Category / tag names (or ids) -> term ids. Existing terms are matched by name or slug, ignoring case, so
- * "seo tips" reuses "SEO Tips". Missing ones are created when the person may manage that taxonomy.
+ * "seo tips" reuses "SEO Tips". Missing ones (already agreed, see livecrafts_page_create) are created when the person
+ * may manage that taxonomy.
  * Returns array( 'ids' => int[], 'used' => array( array( id, name, created ) ) ) or WP_Error.
  */
 function livecrafts_terms_resolve( $taxonomy, array $wanted, $actor ) {
