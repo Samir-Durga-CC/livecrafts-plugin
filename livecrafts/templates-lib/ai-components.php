@@ -1,7 +1,7 @@
 <?php
 /**
  * AI Components template library (bundled inside Livecrafts; not a separate plugin)
- * Description: 25 reusable, theme-independent UI components (hero, cards, pricing, FAQ, header, footer and more) as template parts and shortcodes. Works in Elementor, Divi, WPBakery and custom/ACF themes. One brand color variable re-themes everything.
+ * Description: 26 reusable, theme-independent UI components (hero, cards, pricing, FAQ, header, footer and more) as template parts and shortcodes. Works in Elementor, Divi, WPBakery and custom/ACF themes. One brand color variable re-themes everything.
  * Library version: 1.2.0
  */
 
@@ -9,7 +9,7 @@ defined( 'ABSPATH' ) || exit;
 
 define( 'AI_COMPONENTS_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AI_COMPONENTS_URL', plugin_dir_url( __FILE__ ) );
-define( 'AI_COMPONENTS_VERSION', '1.2.0' );
+define( 'AI_COMPONENTS_VERSION', '1.3.0' );
 
 require_once AI_COMPONENTS_DIR . 'includes/helpers.php';
 
@@ -45,15 +45,16 @@ function ai_components_registry() {
 		'hero_centered' => array( 'items' => false, 'defaults' => array_merge( array( 'eyebrow' => '', 'heading' => '', 'text' => '', 'note' => '' ), $cta ) ),
 		'cta'           => array( 'items' => false, 'defaults' => array_merge( array( 'heading' => '', 'text' => '', 'style' => 'brand' ), $cta ) ),
 		'card'          => array( 'items' => false, 'defaults' => array( 'variant' => 'article', 'title' => '', 'url' => '#', 'image' => '', 'author' => '', 'excerpt' => '', 'date' => '', 'read_time' => '', 'category' => '', 'link_label' => 'Read more' ) ),
-		'blog_grid'     => array( 'items' => true, 'defaults' => array( 'heading' => '', 'text' => '' ) ),
-		'feature_grid'  => array( 'items' => true, 'defaults' => array( 'heading' => '', 'text' => '' ) ),
+		'blog_grid'     => array( 'items' => true, 'defaults' => array( 'variant' => 'grid', 'heading' => '', 'text' => '' ) ),
+		'feature_grid'  => array( 'items' => true, 'defaults' => array( 'variant' => 'icons', 'heading' => '', 'text' => '', 'primary_label' => '', 'primary_url' => '#' ) ),
 		'pricing'       => array( 'items' => true, 'defaults' => array( 'heading' => '', 'text' => '' ) ),
-		'testimonials'  => array( 'items' => true, 'defaults' => array( 'heading' => '' ) ),
+		'testimonials'  => array( 'items' => true, 'defaults' => array( 'variant' => 'cards', 'heading' => '', 'image' => '' ) ),
+		'slider'        => array( 'items' => true, 'defaults' => array( 'variant' => 'hero', 'heading' => '', 'text' => '' ) ),
 		'logo_cloud'    => array( 'items' => true, 'defaults' => array( 'heading' => '' ) ),
 		'stats'         => array( 'items' => true, 'defaults' => array( 'heading' => '', 'text' => '' ) ),
 		'faq'           => array( 'items' => true, 'defaults' => array( 'heading' => '', 'text' => '' ) ),
 		'newsletter'    => array( 'items' => false, 'defaults' => array( 'heading' => '', 'text' => '', 'action' => '', 'field_name' => 'email', 'button_label' => 'Subscribe', 'placeholder' => 'Enter your email', 'note' => '' ) ),
-		'contact_form'  => array( 'items' => false, 'defaults' => array( 'heading' => '', 'text' => '', 'action' => '', 'button_label' => 'Send message', 'email' => '', 'phone' => '', 'address' => '', 'hours' => '' ) ),
+		'contact_form'  => array( 'items' => false, 'defaults' => array( 'variant' => 'split', 'heading' => '', 'text' => '', 'action' => '', 'button_label' => 'Send message', 'email' => '', 'phone' => '', 'address' => '', 'hours' => '' ) ),
 		'header'        => array( 'items' => true, 'defaults' => array( 'logo_text' => '', 'logo_image' => '', 'home_url' => '/', 'cta_label' => '', 'cta_url' => '#' ) ),
 		'footer'        => array( 'items' => true, 'defaults' => array( 'logo_text' => '', 'text' => '', 'copyright' => '' ) ),
 		'team'          => array( 'items' => true, 'defaults' => array( 'heading' => '', 'text' => '' ) ),
