@@ -41,11 +41,13 @@
 	var frame = null;
 	var hint = document.createElement("div");
 	hint.className = "lcw-pickhint";
+	hint.setAttribute("data-livecrafts", "pickhint");
 	hint.innerHTML = "<b>Pick an element</b> - click anything on the page. <kbd>Esc</kbd> to cancel.";
 	hint.hidden = true;
 
 	var box = document.createElement("div");
 	box.className = "lcw-hoverbox";
+	box.setAttribute("data-livecrafts", "hoverbox");
 	box.hidden = true;
 	var tag = document.createElement("span");
 	tag.className = "lcw-hovertag";
@@ -128,7 +130,7 @@
 		document.removeEventListener("keydown", onKey, true);
 		send({ type: "lc:pick-ended" });
 	}
-	function inWidget(el) { return !!(el && el.closest && (el.closest("[data-livecrafts]") || el === box || el === hint || box.contains(el))); }
+	function inWidget(el) { return !!(el && el.closest && (el.closest(CHROME) || el === box || el === hint || box.contains(el))); }
 	function onMove(e) {
 		var el = targetAt(e.clientX, e.clientY);
 		if (!el) { box.hidden = true; hovered = null; return; }
@@ -316,7 +318,7 @@
 		var els = [];
 		try { els = Array.prototype.slice.call(document.querySelectorAll(selector), 0, 200); } catch (e) { return; }
 		els.forEach(function (el) {
-			if (el.closest("[data-livecrafts]")) return;
+			if (el.closest(CHROME)) return;
 			previewed.push({ el: el, style: el.getAttribute("style") || "" });
 			Object.keys(styles).forEach(function (k) { if (styles[k]) el.style.setProperty(k, styles[k], "important"); });
 		});
@@ -387,6 +389,26 @@
 		if (!url) return true;
 		try { var u = new URL(url, location.href); return u.origin === location.origin && u.pathname.replace(/\/+$/, "") === location.pathname.replace(/\/+$/, ""); } catch (e) { return false; }
 	}
+	/**
+	 * Chrome only EDITORS see: this widget, the element picker's overlays and the WordPress admin bar (with whatever
+	 * plugins put in it). A visitor never sees any of it, so the assistant must not see it either - otherwise it reads
+	 * "Howdy, admin" as page content, measures the admin bar's colours as the design, and builds around a chat panel
+	 * that is not there in real life.
+	 */
+	var CHROME = "[data-livecrafts],#wpadminbar,#wpadminbar *,.lcw-hoverbox,.lcw-pickhint";
+	/** Takes that chrome out of the copy of the page the assistant looks at, so it sees exactly the visitor's view. */
+	function hideChrome(doc) {
+		try {
+			var s = doc.createElement("style");
+			s.setAttribute("data-livecrafts", "hide-chrome");
+			s.textContent = "#wpadminbar,[data-livecrafts],.lcw-hoverbox,.lcw-pickhint{display:none !important}"
+				+ "html{margin-top:0 !important;padding-top:0 !important}body{margin-top:0 !important}";
+			(doc.head || doc.documentElement).appendChild(s);
+			// WordPress sets html{margin-top:32px !important}: only an inline !important beats that.
+			if (doc.documentElement) doc.documentElement.style.setProperty("margin-top", "0", "important");
+		} catch (e) { /* a page we may not touch: the filters below still apply */ }
+	}
+
 	function withDoc(args, fn) {
 		var device = args.device || deviceOf(window.innerWidth);
 		// Always look at a FRESH copy of the page (a hidden frame, cache-busted): the tab the person has open was loaded before the
@@ -408,6 +430,7 @@
 					clearTimeout(t);
 					var doc; try { doc = f.contentDocument; } catch (e) { doc = null; }
 					if (!doc) return fail("The page could not be opened in the browser.");
+					hideChrome(doc); // the assistant looks at the visitor's page, never at the editor's chrome
 					Promise.resolve().then(function () { return fn(doc, f.contentWindow, device); })
 						.then(function (r) { done = true; f.remove(); resolve(r); }, function (e) { fail(e && e.message ? e.message : String(e)); });
 				}, 1200); // let fonts and late scripts settle
@@ -418,11 +441,11 @@
 	}
 	function norm(s) { return String(s || "").replace(/\s+/g, " ").trim().toLowerCase(); }
 	function findEls(doc, args) {
-		if (args.selector) { try { return Array.prototype.slice.call(doc.querySelectorAll(args.selector)).filter(function (e) { return !e.closest("[data-livecrafts]"); }); } catch (e) { throw new Error("Invalid CSS selector."); } }
+		if (args.selector) { try { return Array.prototype.slice.call(doc.querySelectorAll(args.selector)).filter(function (e) { return !e.closest(CHROME); }); } catch (e) { throw new Error("Invalid CSS selector."); } }
 		var t = norm(args.text);
 		if (!t) return [];
 		return Array.prototype.filter.call(doc.body.querySelectorAll("*"), function (e) {
-			if (/^(SCRIPT|STYLE|NOSCRIPT)$/.test(e.tagName) || e.closest("[data-livecrafts]")) return false;
+			if (/^(SCRIPT|STYLE|NOSCRIPT)$/.test(e.tagName) || e.closest(CHROME)) return false;
 			return Array.prototype.some.call(e.childNodes, function (n) { return n.nodeType === 3 && norm(n.textContent).indexOf(t) !== -1; });
 		});
 	}
@@ -463,19 +486,19 @@
 	function eyesRead(doc) {
 		return {
 			ok: true, url: doc.location.href.replace(/[?&]lcprobe=\d+/, ""), title: doc.title,
-			headings: Array.prototype.slice.call(doc.querySelectorAll("h1,h2,h3"), 0, 40).map(function (h) { return { tag: h.tagName.toLowerCase(), text: norm(h.textContent).slice(0, 160) }; }),
+			headings: Array.prototype.slice.call(doc.querySelectorAll("h1,h2,h3"), 0, 40).filter(function (h) { return !h.closest(CHROME); }).map(function (h) { return { tag: h.tagName.toLowerCase(), text: norm(h.textContent).slice(0, 160) }; }),
 			text: String(doc.body.innerText || "").replace(/\n{3,}/g, "\n\n").slice(0, 15000),
-			images: Array.prototype.slice.call(doc.images, 0, 30).filter(function (i) { return !i.closest("[data-livecrafts]"); }).map(function (i) { return { src: i.currentSrc || i.src, alt: i.alt, width: i.naturalWidth, height: i.naturalHeight }; }),
-			links: Array.prototype.slice.call(doc.querySelectorAll("a[href]"), 0, 50).filter(function (l) { return !l.closest("[data-livecrafts]"); }).map(function (l) { return { text: norm(l.textContent).slice(0, 60), href: l.href }; }),
+			images: Array.prototype.slice.call(doc.images, 0, 30).filter(function (i) { return !i.closest(CHROME); }).map(function (i) { return { src: i.currentSrc || i.src, alt: i.alt, width: i.naturalWidth, height: i.naturalHeight }; }),
+			links: Array.prototype.slice.call(doc.querySelectorAll("a[href]"), 0, 50).filter(function (l) { return !l.closest(CHROME); }).map(function (l) { return { text: norm(l.textContent).slice(0, 60), href: l.href }; }),
 		};
 	}
 	function eyesDesign(doc, win) {
 		var cs = function (el) { return win.getComputedStyle(el); };
-		var pick = function (sel) { var el = doc.querySelector(sel); if (!el || el.closest("[data-livecrafts]")) return null; var s = cs(el); return { family: s.fontFamily.split(",")[0].replace(/["']/g, "").trim(), size: s.fontSize, weight: s.fontWeight, lineHeight: s.lineHeight, color: s.color, letterSpacing: s.letterSpacing, textTransform: s.textTransform }; };
+		var pick = function (sel) { var el = doc.querySelector(sel); if (!el || el.closest(CHROME)) return null; var s = cs(el); return { family: s.fontFamily.split(",")[0].replace(/["']/g, "").trim(), size: s.fontSize, weight: s.fontWeight, lineHeight: s.lineHeight, color: s.color, letterSpacing: s.letterSpacing, textTransform: s.textTransform }; };
 		var typography = {}; ["h1", "h2", "h3", "h4", "p", "a", "li", "button"].forEach(function (t) { typography[t] = pick(t); });
 		var count = function (m, k) { if (k && !/rgba\(0, 0, 0, 0\)|transparent/.test(k)) m[k] = (m[k] || 0) + 1; };
 		var text = {}, bg = {}, radius = {}, gaps = {};
-		var all = Array.prototype.slice.call(doc.body.querySelectorAll("*"), 0, 3000).filter(function (e) { return !e.closest("[data-livecrafts]"); });
+		var all = Array.prototype.slice.call(doc.body.querySelectorAll("*"), 0, 3000).filter(function (e) { return !e.closest(CHROME); });
 		all.forEach(function (el) {
 			var s = cs(el);
 			if (Array.prototype.some.call(el.childNodes, function (n) { return n.nodeType === 3 && n.textContent.trim(); })) count(text, s.color);
@@ -520,7 +543,7 @@
 			var whole = node === doc.body;
 			var w = whole ? win.innerWidth : Math.ceil(node.getBoundingClientRect().width);
 			var opts = { scale: Math.min(1, 1400 / Math.max(1, w)), quality: 0.82, backgroundColor: "#ffffff",
-				filter: function (n) { return !(n && n.getAttribute && n.getAttribute("data-livecrafts")); } };
+				filter: function (n) { return !(n && n.nodeType === 1 && (n.id === "wpadminbar" || (n.getAttribute && n.getAttribute("data-livecrafts")))); } };
 			// the page: what fits the screen (or the full page); an element: let the library measure it exactly
 			if (whole) { opts.width = w; opts.height = Math.max(1, Math.min(doc.documentElement.scrollHeight, args.fullPage ? 6000 : win.innerHeight)); }
 			else opts.style = { margin: "0" }; // the copy must not pick up default margins (they push the content out of the picture)
