@@ -9,7 +9,7 @@ defined( 'ABSPATH' ) || exit;
 
 define( 'AI_COMPONENTS_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AI_COMPONENTS_URL', plugin_dir_url( __FILE__ ) );
-define( 'AI_COMPONENTS_VERSION', '1.3.0' );
+define( 'AI_COMPONENTS_VERSION', '1.4.0' );
 
 require_once AI_COMPONENTS_DIR . 'includes/helpers.php';
 
@@ -41,7 +41,7 @@ function ai_components_registry() {
 		'breadcrumbs'   => array( 'items' => true, 'defaults' => array() ),
 		'pagination'    => array( 'items' => false, 'defaults' => array( 'current' => 1, 'total' => 1, 'url_pattern' => '?paged=%d' ) ),
 		'empty_state'   => array( 'items' => false, 'defaults' => array( 'icon' => 'search', 'title' => '', 'text' => '', 'label' => '', 'url' => '#' ) ),
-		'hero'          => array( 'items' => false, 'defaults' => array_merge( array( 'eyebrow' => '', 'heading' => '', 'text' => '', 'image' => '' ), $cta ) ),
+		'hero'          => array( 'items' => true, 'defaults' => array_merge( array( 'variant' => 'split', 'eyebrow' => '', 'heading' => '', 'text' => '', 'image' => '', 'proof' => '' ), $cta ) ),
 		'hero_centered' => array( 'items' => false, 'defaults' => array_merge( array( 'eyebrow' => '', 'heading' => '', 'text' => '', 'note' => '' ), $cta ) ),
 		'cta'           => array( 'items' => false, 'defaults' => array_merge( array( 'heading' => '', 'text' => '', 'style' => 'brand' ), $cta ) ),
 		'card'          => array( 'items' => false, 'defaults' => array( 'variant' => 'article', 'title' => '', 'url' => '#', 'image' => '', 'author' => '', 'excerpt' => '', 'date' => '', 'read_time' => '', 'category' => '', 'link_label' => 'Read more' ) ),
@@ -56,7 +56,7 @@ function ai_components_registry() {
 		'newsletter'    => array( 'items' => false, 'defaults' => array( 'heading' => '', 'text' => '', 'action' => '', 'field_name' => 'email', 'button_label' => 'Subscribe', 'placeholder' => 'Enter your email', 'note' => '' ) ),
 		'contact_form'  => array( 'items' => false, 'defaults' => array( 'variant' => 'split', 'heading' => '', 'text' => '', 'action' => '', 'button_label' => 'Send message', 'email' => '', 'phone' => '', 'address' => '', 'hours' => '' ) ),
 		'header'        => array( 'items' => true, 'defaults' => array( 'logo_text' => '', 'logo_image' => '', 'home_url' => '/', 'cta_label' => '', 'cta_url' => '#' ) ),
-		'footer'        => array( 'items' => true, 'defaults' => array( 'logo_text' => '', 'text' => '', 'copyright' => '' ) ),
+		'footer'        => array( 'items' => true, 'defaults' => array_merge( array( 'variant' => 'columns', 'logo_text' => '', 'text' => '', 'copyright' => '', 'legal' => '', 'cta_heading' => '', 'cta_text' => '' ), $cta ) ),
 		'team'          => array( 'items' => true, 'defaults' => array( 'heading' => '', 'text' => '' ) ),
 		'steps'         => array( 'items' => true, 'defaults' => array( 'heading' => '', 'text' => '' ) ),
 		'sidebar'       => array( 'items' => true, 'defaults' => array( 'heading' => '', 'box_title' => '', 'box_text' => '', 'box_label' => '', 'box_url' => '#', 'search_action' => '' ) ),
