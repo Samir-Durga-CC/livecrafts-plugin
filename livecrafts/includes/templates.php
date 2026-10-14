@@ -46,7 +46,11 @@ function livecrafts_template_doc( $file ) {
 	$head = (string) file_get_contents( $file, false, null, 0, 4000 );
 	$doc  = array( 'title' => '', 'params' => '', 'shortcode' => '', 'items' => '' );
 	if ( preg_match( '/Component:\s*(.+)/', $head, $m ) ) $doc['title'] = trim( $m[1] );
-	if ( preg_match( '/Params:\s*(.+)/', $head, $m ) ) $doc['params'] = trim( $m[1] );
+	// Params may wrap over several lines of the docblock; join them, or the assistant never learns about the
+	// attributes on the second line (it was missing items[] and the buttons of footer, hero and pricing).
+	if ( preg_match( '/Params:\s*(.+?)(?=^\s*\*\s*(?:Shortcode|Component|ACF)|^\s*\*\/)/ms', $head, $m ) ) {
+		$doc['params'] = trim( preg_replace( '/\s*\R\s*\*\s*/', ' ', $m[1] ) );
+	}
 	if ( preg_match( '/Shortcode:\s*(.+)/', $head, $m ) ) $doc['shortcode'] = trim( $m[1] );
 	if ( preg_match( '/items\s*\[([^\]]*)\]/', $doc['params'], $m ) ) $doc['items'] = trim( $m[1] );
 	return $doc;
