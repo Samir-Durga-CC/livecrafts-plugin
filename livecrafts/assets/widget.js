@@ -423,7 +423,9 @@
 			f.style.cssText = "position:fixed;left:-30000px;top:0;width:" + (DEVW[device] || 1366) + "px;height:900px;border:0;opacity:0;pointer-events:none";
 			var done = false;
 			var fail = function (msg) { if (done) return; done = true; f.remove(); reject(new Error(msg)); };
-			var t = setTimeout(function () { fail("The page took too long to load in the browser."); }, 25000);
+			// A heavy page (a builder home page with lazy images) needs more than 25s on a slow connection; the backend
+			// waits longer than this before it gives up and uses the server's own browser instead.
+			var t = setTimeout(function () { fail("The page took too long to load in this browser."); }, 45000);
 			f.onload = function () {
 				setTimeout(function () {
 					if (done) return;
@@ -545,7 +547,9 @@
 			var opts = { scale: Math.min(1, 1400 / Math.max(1, w)), quality: 0.82, backgroundColor: "#ffffff",
 				filter: function (n) { return !(n && n.nodeType === 1 && (n.id === "wpadminbar" || (n.getAttribute && n.getAttribute("data-livecrafts")))); } };
 			// the page: what fits the screen (or the full page); an element: let the library measure it exactly
-			if (whole) { opts.width = w; opts.height = Math.max(1, Math.min(doc.documentElement.scrollHeight, args.fullPage ? 6000 : win.innerHeight)); }
+			// Painting a copy of the whole page is the slow part: 6000px of a builder page could take longer than the
+			// request was allowed to. 3500px is about four screens - enough to judge a section in place.
+			if (whole) { opts.width = w; opts.height = Math.max(1, Math.min(doc.documentElement.scrollHeight, args.fullPage ? 3500 : win.innerHeight)); }
 			else opts.style = { margin: "0" }; // the copy must not pick up default margins (they push the content out of the picture)
 			return lib.domToJpeg(node, opts).then(function (dataUrl) {
 				return { ok: true, image: dataUrl, device: device, target: target, url: doc.location.href.replace(/[?&]lcprobe=\d+/, ""), note: "Captured in the person's own browser." };
