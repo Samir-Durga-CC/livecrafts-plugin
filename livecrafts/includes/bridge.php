@@ -84,6 +84,7 @@ function livecrafts_rest_map( WP_REST_Request $req ) {
 		'elementor_outline' => livecrafts_el_outline( livecrafts_el_tree( $data ) ),
 		'divi'         => $divi,
 		'divi_outline' => livecrafts_divi_outline( $data['fields']['content'] ),
+		'sections'  => livecrafts_sections_map( $post ),
 		'drafts'    => count( livecrafts_draft_changes( 'post', $post ) ),
 		'note'      => 'Each entry has a stable target id (tid). Change it with POST /changes (kind acf.field target <field key>, kind el.setting target <element id>:<setting>, or kind divi.text / divi.link target <path>:<field> - each divi entry carries the exact kind in "change" and target in "target"). Text not listed here is not in ACF/Elementor/Divi (it may be block content, a menu, a widget or the theme).',
 	);

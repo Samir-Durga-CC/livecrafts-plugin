@@ -140,6 +140,26 @@ function livecrafts_kinds() {
 				return true;
 			},
 		),
+		// A section Livecrafts renders inside a page the THEME builds (sections.php). Target = where it goes
+		// ("before:template-parts/why", "after:...", "start", "end"); value = the markup, '' removes it.
+		'theme.section' => array(
+			'object'  => 'post',
+			'prepare' => 'livecrafts_kind_theme_section_prepare',
+			'read'    => function ( $data, $target ) {
+				foreach ( (array) ( isset( $data['meta'][ LIVECRAFTS_SECTIONS_META ] ) ? $data['meta'][ LIVECRAFTS_SECTIONS_META ] : array() ) as $row ) {
+					if ( is_array( $row ) && isset( $row['anchor'] ) && $row['anchor'] === $target ) return (string) $row['content'];
+				}
+				return '';
+			},
+			'apply'   => function ( &$data, $target, $after ) {
+				$now = (array) ( isset( $data['meta'][ LIVECRAFTS_SECTIONS_META ] ) ? $data['meta'][ LIVECRAFTS_SECTIONS_META ] : array() );
+				$rows = array();
+				foreach ( $now as $row ) if ( is_array( $row ) && ! empty( $row['anchor'] ) && isset( $row['content'] ) ) $rows[] = array( 'anchor' => (string) $row['anchor'], 'content' => (string) $row['content'] );
+				$next = livecrafts_sections_set( $rows, $target, (string) $after );
+				if ( $next ) $data['meta'][ LIVECRAFTS_SECTIONS_META ] = $next; else unset( $data['meta'][ LIVECRAFTS_SECTIONS_META ] );
+				return true;
+			},
+		),
 		// Blocks inside the page content (blocks.php).
 		'block.text'      => livecrafts_block_kind( 'text' ),
 		'block.link'      => livecrafts_block_kind( 'link' ),
@@ -500,4 +520,27 @@ function livecrafts_acf_rows_revert( array $c ) {
 			return array( 'acf.rows', $c['target'], array( 'op' => 'add', 'index' => $i, 'layout' => $c['payload']['removed_layout'], 'row' => $c['payload']['removed_row'] ), array( 'restore_row' => true ) );
 	}
 	return new WP_Error( 'livecrafts_no_revert', 'This row change cannot be reverted automatically.' );
+}
+
+/**
+ * A section rendered by Livecrafts inside a theme-built page. The value is markup (normally ONE template shortcode):
+ * it is cleaned like post content, so a theme-built page can never be given a script.
+ */
+function livecrafts_kind_theme_section_prepare( $post_id, $target, $value, array $draft ) {
+	$anchor = livecrafts_sections_clean_anchor( $target );
+	if ( ! $anchor ) {
+		return new WP_Error( 'livecrafts_bad_target', 'A section needs a place: "before:<template part>", "after:<template part>", "start" or "end". GET /map lists the places this page has (sections.places).' );
+	}
+	$content = (string) $value;
+	if ( mb_strlen( $content ) > 20000 ) return new WP_Error( 'livecrafts_too_long', 'That section is too long (max 20000 characters). Place a template shortcode instead of markup.' );
+	$clean = $content === '' ? '' : trim( wp_kses_post( $content ) );
+	if ( $content !== '' && $clean === '' ) return new WP_Error( 'livecrafts_empty', 'Nothing of that section survived cleaning. Place a template shortcode (see GET /templates).' );
+	$where = $anchor === 'start' ? 'at the top of the page' : ( $anchor === 'end' ? 'at the end of the page' : str_replace( ':', ' the theme part ', $anchor ) );
+	$what  = preg_match( '/\[([a-z0-9_]+)/i', $clean, $m ) ? 'the ' . str_replace( 'ai_', '', $m[1] ) . ' template' : 'a section';
+	return array(
+		'target'  => $anchor,
+		'after'   => $clean,
+		'payload' => array( 'anchor' => $anchor ),
+		'summary' => $clean === '' ? 'Section removed (' . $where . ')' : 'Section added ' . $where . ': ' . $what,
+	);
 }
