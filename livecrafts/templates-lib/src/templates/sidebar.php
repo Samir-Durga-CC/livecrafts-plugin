@@ -16,8 +16,8 @@ $search_action = $args['search_action'] ?? '';
   <?php if ( $search_action ) : ?>
   <form action="<?php echo esc_url( $search_action ); ?>" method="get" role="search" class="relative m-0">
     <label for="ai-sb-search" class="sr-only">Search</label>
-    <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400"><?php ai_e_icon( 'search', 5 ); ?></span>
-    <input id="ai-sb-search" type="search" name="s" placeholder="Search" class="block w-full rounded-lg border-0 bg-surface py-3 pr-4 pl-10 text-sm text-ink shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-brand-600 focus:outline-none" />
+    <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-subtle"><?php ai_e_icon( 'search', 5 ); ?></span>
+    <input id="ai-sb-search" type="search" name="s" placeholder="Search" class="block w-full rounded-lg border-0 bg-surface py-3 pr-4 pl-10 text-sm text-ink shadow-sm ring-1 ring-inset ring-line placeholder:text-subtle focus:ring-2 focus:ring-brand-600 focus:outline-none" />
   </form>
   <?php endif; ?>
 
@@ -30,7 +30,7 @@ $search_action = $args['search_action'] ?? '';
       <li class="m-0 p-0">
         <a href="<?php echo esc_url( $item['url'] ?? '#' ); ?>" class="<?php echo esc_attr( ai_cls( 'flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium no-underline transition-colors' ) . ' ' . ( ! empty( $item['current'] ) ? ai_cls( 'bg-brand-50 text-brand-700' ) : ai_cls( 'text-muted hover:bg-surface-alt hover:text-ink' ) ) ); ?>">
           <span><?php echo esc_html( $item['label'] ?? '' ); ?></span>
-          <span class="text-gray-400"><?php ai_e_icon( 'chevron-right', 4 ); ?></span>
+          <span class="text-subtle"><?php ai_e_icon( 'chevron-right', 4 ); ?></span>
         </a>
       </li>
       <?php endforeach; ?>

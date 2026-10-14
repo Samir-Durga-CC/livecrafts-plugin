@@ -34,8 +34,8 @@ $off        = ai_cls( 'ai:text-muted ai:hover:text-brand-700' );
     <?php endif; ?>
 
     <details class="ai:relative ai:m-0 ai:md:hidden">
-      <summary class="ai:flex ai:size-10 ai:cursor-pointer ai:items-center ai:justify-center ai:rounded-lg ai:text-muted ai:hover:bg-gray-100" aria-label="Open menu"><?php ai_e_icon( 'menu', 6 ); ?></summary>
-      <div class="ai:absolute ai:right-0 ai:z-40 ai:mt-3 ai:flex ai:w-64 ai:flex-col ai:gap-1 ai:rounded-ctl ai:bg-surface ai:p-3 ai:shadow-lg ai:ring-1 ai:ring-gray-950/5">
+      <summary class="ai:flex ai:size-10 ai:cursor-pointer ai:items-center ai:justify-center ai:rounded-lg ai:text-muted ai:hover:bg-surface-alt" aria-label="Open menu"><?php ai_e_icon( 'menu', 6 ); ?></summary>
+      <div class="ai:absolute ai:right-0 ai:z-40 ai:mt-3 ai:flex ai:w-64 ai:flex-col ai:gap-1 ai:rounded-ctl ai:bg-surface ai:p-3 ai:shadow-lg ai:ring-1 ai:ring-ink/5">
         <?php foreach ( $items as $item ) : ?>
         <a href="<?php echo esc_url( $item['url'] ?? '#' ); ?>" class="<?php echo esc_attr( ai_cls( 'ai:rounded-lg ai:px-3 ai:py-2 ai:text-sm ai:font-medium ai:no-underline ai:hover:bg-surface-alt' ) . ' ' . ( ! empty( $item['current'] ) ? $on : ai_cls( 'ai:text-muted' ) ) ); ?>"><?php echo esc_html( $item['label'] ?? '' ); ?></a>
         <?php endforeach; ?>

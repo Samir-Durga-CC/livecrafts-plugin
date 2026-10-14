@@ -18,7 +18,7 @@ $info         = array(
 	'pin'   => $args['address'] ?? '',
 	'clock' => $args['hours'] ?? '',
 );
-$input = ai_cls( 'ai:mt-2 ai:block ai:w-full ai:rounded-lg ai:border-0 ai:bg-surface ai:px-4 ai:py-3 ai:text-base ai:text-ink ai:shadow-sm ai:ring-1 ai:ring-inset ai:ring-gray-300 ai:placeholder:text-gray-400 ai:focus:ring-2 ai:focus:ring-brand-600 ai:focus:outline-none' );
+$input = ai_cls( 'ai:mt-2 ai:block ai:w-full ai:rounded-lg ai:border-0 ai:bg-surface ai:px-4 ai:py-3 ai:text-base ai:text-ink ai:shadow-sm ai:ring-1 ai:ring-inset ai:ring-line ai:placeholder:text-subtle ai:focus:ring-2 ai:focus:ring-brand-600 ai:focus:outline-none' );
 $dark  = ai_cls( 'ai:block ai:w-full ai:min-w-0 ai:rounded-lg ai:border-0 ai:bg-white/10 ai:px-4 ai:py-3 ai:text-base ai:text-white ai:shadow-sm ai:ring-1 ai:ring-inset ai:ring-white/20 ai:placeholder:text-white/60 ai:focus:ring-2 ai:focus:ring-white ai:focus:outline-none' );
 $btn   = ai_cls( 'ai:inline-flex ai:cursor-pointer ai:items-center ai:justify-center ai:rounded-lg ai:border-0 ai:bg-brand-600 ai:px-6 ai:py-3 ai:text-base ai:font-semibold ai:text-white ai:shadow-sm ai:transition-colors ai:hover:bg-brand-700 ai:focus-visible:outline-2 ai:focus-visible:outline-offset-2 ai:focus-visible:outline-brand-600' );
 $label = ai_cls( 'ai:block ai:text-sm ai:font-semibold ai:text-ink' );

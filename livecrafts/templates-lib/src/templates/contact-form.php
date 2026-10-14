@@ -18,7 +18,7 @@ $info         = array(
 	'pin'   => $args['address'] ?? '',
 	'clock' => $args['hours'] ?? '',
 );
-$input = ai_cls( 'mt-2 block w-full rounded-lg border-0 bg-surface px-4 py-3 text-base text-ink shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-brand-600 focus:outline-none' );
+$input = ai_cls( 'mt-2 block w-full rounded-lg border-0 bg-surface px-4 py-3 text-base text-ink shadow-sm ring-1 ring-inset ring-line placeholder:text-subtle focus:ring-2 focus:ring-brand-600 focus:outline-none' );
 $dark  = ai_cls( 'block w-full min-w-0 rounded-lg border-0 bg-white/10 px-4 py-3 text-base text-white shadow-sm ring-1 ring-inset ring-white/20 placeholder:text-white/60 focus:ring-2 focus:ring-white focus:outline-none' );
 $btn   = ai_cls( 'inline-flex cursor-pointer items-center justify-center rounded-lg border-0 bg-brand-600 px-6 py-3 text-base font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600' );
 $label = ai_cls( 'block text-sm font-semibold text-ink' );

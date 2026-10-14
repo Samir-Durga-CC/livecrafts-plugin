@@ -34,8 +34,8 @@ $off        = ai_cls( 'text-muted hover:text-brand-700' );
     <?php endif; ?>
 
     <details class="relative m-0 md:hidden">
-      <summary class="flex size-10 cursor-pointer items-center justify-center rounded-lg text-muted hover:bg-gray-100" aria-label="Open menu"><?php ai_e_icon( 'menu', 6 ); ?></summary>
-      <div class="absolute right-0 z-40 mt-3 flex w-64 flex-col gap-1 rounded-ctl bg-surface p-3 shadow-lg ring-1 ring-gray-950/5">
+      <summary class="flex size-10 cursor-pointer items-center justify-center rounded-lg text-muted hover:bg-surface-alt" aria-label="Open menu"><?php ai_e_icon( 'menu', 6 ); ?></summary>
+      <div class="absolute right-0 z-40 mt-3 flex w-64 flex-col gap-1 rounded-ctl bg-surface p-3 shadow-lg ring-1 ring-ink/5">
         <?php foreach ( $items as $item ) : ?>
         <a href="<?php echo esc_url( $item['url'] ?? '#' ); ?>" class="<?php echo esc_attr( ai_cls( 'rounded-lg px-3 py-2 text-sm font-medium no-underline hover:bg-surface-alt' ) . ' ' . ( ! empty( $item['current'] ) ? $on : ai_cls( 'text-muted' ) ) ); ?>"><?php echo esc_html( $item['label'] ?? '' ); ?></a>
         <?php endforeach; ?>

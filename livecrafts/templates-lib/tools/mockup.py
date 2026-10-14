@@ -25,7 +25,8 @@ SAMPLE = {
     "title": "Fast delivery",
     "quote": "They understood our brand from day one and turned it into a website we are proud of.",
     "name": "Anita Shah", "role": "Founder, Acme Foods", "excerpt": "A short excerpt that gives readers a reason to click through.",
-    "category": "Design", "date": "12 Oct 2026", "read_time": "5 min read", "label": "Start a project",
+    "category": "Design", "date": "12 Oct 2026", "read_time": "5 min read", "label": "Projects delivered",
+    "value": "150+", "price": "$29", "period": "/month", "period_": "", "name": "Anita Shah", "role": "Founder, Acme Foods",
     "link_label": "Read more", "button_label": "Send message", "value": "hello@example.com",
 }
 
@@ -38,8 +39,33 @@ def sample_for(expr: str) -> str:
     return SAMPLE["title"]
 
 
-def strip_php(src: str) -> str:
-    cls = dict(re.findall(r"\$(\w+)\s*=\s*ai_cls\(\s*'([^']*)'\s*\)", src))
+def inline_components(src: str, depth: int = 0) -> str:
+    """
+    `ai_component( 'part-head', ... )` renders another template. Without this the preview would silently drop every
+    heading and button that moved into a shared partial - and a blank preview is worse than no preview.
+    """
+    if depth > 3:
+        return src
+
+    def one(m):
+        name = m.group(1).replace("_", "-")
+        f = TEMPLATES / f"{name}.php"
+        if not f.exists():
+            return ""
+        return strip_php(inline_components(f.read_text(encoding="utf-8"), depth + 1), depth + 1)
+
+    return re.sub(r"<\?php\s+ai_component\(\s*'([\w-]+)'[^?]*?\);?\s*\?>", one, src, flags=re.S)
+
+
+def strip_php(src: str, depth: int = 0) -> str:
+    src = inline_components(src, depth)
+    # $x = ai_cls('a'); and $x = $dark ? ai_cls('a') : ai_cls('b'); - the last string wins (the else branch, which
+    # is what a light page shows). Without this, every class that lives in a variable renders as nothing.
+    cls = {}
+    for name, rhs in re.findall(r"\$(\w+)\s*=\s*([^;]+);", src):
+        found = re.findall(r"ai_cls\(\s*'([^']*)'\s*\)", rhs)
+        if found:
+            cls[name] = found[-1]
 
     # class="<?php echo esc_attr( $x ); ?> more" -> the literal classes that variable holds
     def attr(m):
