@@ -140,8 +140,62 @@ function livecrafts_template_variants( $params ) {
 }
 
 /**
- * /?lc_tpl_preview=<id>&lc_tpl_variant=<layout> - one template, rendered on its own, for an editor to look at.
- * The theme's own head is loaded, so the preview shows the site's real fonts and colours.
+ * GET /livecrafts/v1/templates/render?id=<id>&variant=<layout>
+ *
+ * The component's HTML on its own, with the stylesheets that make it look right - no page, no header, no theme
+ * chrome. The Livecrafts app shows each one in its own isolated frame, the way a component library's documentation
+ * does. This is server-to-server (an Application Password), so nobody has to be logged into the site in a browser.
+ */
+add_action( 'rest_api_init', function () {
+	register_rest_route(
+		'livecrafts/v1',
+		'/templates/render',
+		array(
+			'methods'             => 'GET',
+			'permission_callback' => 'livecrafts_rest_permission',
+			'callback'            => function ( WP_REST_Request $req ) {
+				if ( ! function_exists( 'ai_component' ) ) {
+					return new WP_Error( 'livecrafts_no_library', 'The template library is not available on this site.', array( 'status' => 404 ) );
+				}
+				$id      = sanitize_key( (string) $req->get_param( 'id' ) );
+				$variant = sanitize_key( (string) $req->get_param( 'variant' ) );
+				if ( '' === $id ) {
+					return new WP_Error( 'livecrafts_no_id', 'Pass the template id, e.g. id=testimonials.', array( 'status' => 400 ) );
+				}
+
+				$args = livecrafts_template_sample( $id );
+				if ( $variant ) {
+					$args['variant'] = $variant;
+				}
+				$html = ai_component( str_replace( '_', '-', $id ), $args, false );
+				if ( '' === $html ) {
+					return new WP_Error( 'livecrafts_unknown_template', 'There is no template called "' . $id . '".', array( 'status' => 404 ) );
+				}
+
+				// The library's own stylesheet, and the theme's, so the preview carries the site's fonts. The
+				// components are built to survive a theme's CSS, so loading it changes type and colour, not layout.
+				$css = array( AI_COMPONENTS_URL . 'assets/css/ai-components.css?ver=' . AI_COMPONENTS_VERSION );
+				$theme = get_stylesheet_uri();
+				if ( $theme ) {
+					$css[] = $theme;
+				}
+				return array(
+					'ok'      => true,
+					'id'      => $id,
+					'variant' => $variant,
+					'html'    => $html,
+					'css'     => $css,
+					'custom'  => (string) wp_get_custom_css(),
+					'sample'  => true,
+				);
+			},
+		)
+	);
+} );
+
+/**
+ * /?lc_tpl_preview=<id>&lc_tpl_variant=<layout> - the same thing as a page an editor can open in a tab.
+ * The theme's own head is loaded, so it shows the site's real fonts and colours.
  */
 add_action( 'template_redirect', function () {
 	$id = isset( $_GET['lc_tpl_preview'] ) ? sanitize_key( wp_unslash( $_GET['lc_tpl_preview'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only preview, capability checked below
