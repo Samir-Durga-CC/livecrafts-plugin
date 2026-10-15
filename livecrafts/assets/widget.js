@@ -293,6 +293,7 @@
 		else if (d.type === "lc:highlight" && d.selector) {
 			try { var el = document.querySelector(d.selector); if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); outline(el); setTimeout(function () { if (!picking) box.hidden = true; }, 1800); } } catch (x) { /* bad selector */ }
 		}
+		else if (d.type === "lc:soft-refresh") { softRefresh(d.selector); }
 		else if (d.type === "lc:reload") {
 			// show the change like Ctrl+Shift+R: refresh this site's cached CSS/JS first, then reload; keep the panel open
 			state.open = true; state.tab = d.tab || state.tab; save();
@@ -363,6 +364,56 @@
 		var newText = (ed.el.textContent || "").replace(/\s+/g, " ").trim();
 		if (!save || newText === ed.oldText) { ed.el.innerHTML = ed.oldHtml; send({ type: "lc:text-cancelled" }); return; }
 		send({ type: "lc:text-edited", selector: ed.selector, oldText: ed.oldText, newText: newText });
+	}
+
+	/**
+	 * Show what changed WITHOUT reloading the page.
+	 *
+	 * The page is fetched again in the background and compared with what is on screen, section by section; only the
+	 * parts that actually differ are swapped in. Nothing else moves: no white flash, no lost scroll position, no
+	 * menu or slider re-initialising. If anything about it fails, the person is offered a normal refresh instead -
+	 * it never leaves a half-updated page.
+	 */
+	function softRefresh(selector) {
+		var url = new URL(location.href);
+		url.searchParams.set("lcfresh", String(Date.now()));
+		return fetch(url.href, { credentials: "same-origin", cache: "reload" })
+			.then(function (r) { return r.ok ? r.text() : Promise.reject(new Error("HTTP " + r.status)); })
+			.then(function (html) {
+				var doc = new DOMParser().parseFromString(html, "text/html");
+				var fresh = doc.body, live = document.body;
+				if (!fresh || !live) throw new Error("no body");
+				var a = Array.prototype.filter.call(live.children, keepable);
+				var b = Array.prototype.filter.call(fresh.children, keepable);
+				var changed = 0;
+				if (a.length === b.length) {
+					// same shape: replace only the blocks whose markup differs
+					for (var i = 0; i < a.length; i++) {
+						if (a[i].outerHTML !== b[i].outerHTML) { a[i].replaceWith(b[i].cloneNode(true)); changed++; }
+					}
+				} else {
+					// a section was added or removed: rebuild the page's blocks, keeping everything of ours
+					for (var j = 0; j < a.length; j++) a[j].remove();
+					var at = live.firstChild;
+					for (var k = 0; k < b.length; k++) live.insertBefore(b[k].cloneNode(true), at);
+					changed = Math.abs(b.length - a.length) + 1;
+				}
+				if (changed && selector) {
+					var el = document.querySelector(selector);
+					if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); outline(el); }
+				}
+				send({ type: "lc:refreshed", changed: changed, soft: true });
+				return changed;
+			})
+			.catch(function (e) {
+				// Could not patch it in place: say so, and let the person refresh when they want to.
+				send({ type: "lc:refreshed", changed: 0, soft: false, error: e && e.message ? e.message : String(e) });
+			});
+	}
+
+	/** Our own chrome is never touched by a soft refresh (the chat, the draft bar, the picker overlays). */
+	function keepable(el) {
+		return !el.hasAttribute("data-livecrafts") && el.tagName !== "SCRIPT" && el.tagName !== "NOSCRIPT" && el.id !== "wpadminbar";
 	}
 
 	/** Like Ctrl+Shift+R: re-download this site's stylesheets/scripts into the browser cache, then reload. */
