@@ -67,6 +67,8 @@ function livecrafts_templates_catalogue() {
 			'shortcode'  => 'ai_' . $name,
 			'title'      => $doc['title'],
 			'params'     => $doc['params'],
+			'variants'   => function_exists( 'livecrafts_template_variants' ) ? livecrafts_template_variants( $doc['params'] ) : array(),
+			'preview'    => add_query_arg( 'lc_tpl_preview', $id, home_url( '/' ) ),
 			'example'    => $doc['shortcode'],
 			'attributes' => array_keys( $def['defaults'] ),
 			'defaults'   => $def['defaults'],
