@@ -277,6 +277,17 @@ function livecrafts_page_create( array $a, array $opts = array() ) {
 }
 
 /**
+ * A page / post that Livecrafts created and that was not deployed yet: still a WordPress draft, with its open
+ * post.create change. Only these may be shown through a preview token (see preview.php).
+ */
+function livecrafts_is_new_draft_post( $post_id ) {
+	global $wpdb;
+	$post_id = (int) $post_id;
+	if ( $post_id <= 0 || get_post_status( $post_id ) !== 'draft' ) return false;
+	return (bool) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . livecrafts_table( 'changes' ) . " WHERE kind = 'post.create' AND status = 'draft' AND object_type = 'post' AND object_id = %d", $post_id ) );
+}
+
+/**
  * Categories / tags of a blog post from $a['categories'] / $a['tags']. Existing ones are used as they are; a NEW one
  * is only created when it is listed in $a['create_terms'] (the person agreed to add it). Otherwise nothing is
  * written and the error names what is missing. Returns array( taxonomy => resolved ) or WP_Error.
@@ -310,13 +321,11 @@ function livecrafts_post_terms_prepare( array $a, $actor ) {
  * else sees). $a: categories?, tags? (replace the current ones), create_terms?. Published posts: WP admin.
  */
 function livecrafts_post_terms_set( $post_id, array $a, array $opts = array() ) {
-	global $wpdb;
 	$actor = isset( $opts['actor'] ) ? (int) $opts['actor'] : get_current_user_id();
 	$post  = get_post( $post_id );
 	if ( ! $post || $post->post_type !== 'post' ) return new WP_Error( 'livecrafts_no_page', 'That blog post does not exist.', array( 'status' => 404 ) );
 	if ( ! current_user_can( 'edit_post', $post->ID ) || ! user_can( $actor, 'edit_post', $post->ID ) ) return new WP_Error( 'livecrafts_forbidden', 'You cannot edit this post.', array( 'status' => 403 ) );
-	$new = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . livecrafts_table( 'changes' ) . " WHERE kind = 'post.create' AND status = 'draft' AND object_type = 'post' AND object_id = %d", $post->ID ) );
-	if ( ! $new || $post->post_status !== 'draft' ) {
+	if ( ! livecrafts_is_new_draft_post( $post->ID ) ) {
 		return new WP_Error( 'livecrafts_published', 'Categories and tags can be changed here only for a new post that was not deployed yet. For this post change them in WP admin (Posts → Edit).', array( 'status' => 409 ) );
 	}
 	$terms = livecrafts_post_terms_prepare( $a, $actor );

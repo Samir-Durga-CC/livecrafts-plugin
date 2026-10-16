@@ -41,7 +41,10 @@ function livecrafts_rest_site_profile() {
 			'elementor' => livecrafts_comp_try( 'livecrafts_profile_elementor', array( 'active' => false ) ),
 			'acf'       => livecrafts_comp_try( 'livecrafts_profile_acf', array( 'active' => false ) ),
 			'blocks'    => array( 'patterns' => count( livecrafts_comp_try( 'livecrafts_comp_registered_patterns' ) ) ),
+			'others'    => livecrafts_comp_try( 'livecrafts_profile_other_builders' ),
 		),
+		'brand'    => livecrafts_comp_try( 'livecrafts_profile_brand', array() ),
+		'posts'    => livecrafts_comp_try( 'livecrafts_profile_posts', array() ),
 		'forms'    => livecrafts_comp_try( 'livecrafts_profile_forms' ),
 		'seo'      => array( 'plugin' => livecrafts_seo_plugin() ?: null, 'meta_key' => livecrafts_seo_meta_key() ),
 		'templates' => livecrafts_comp_try( 'livecrafts_templates_summary', array( 'active' => false ) ),
@@ -74,6 +77,83 @@ function livecrafts_profile_elementor() {
 		return $rows;
 	} );
 	return $out;
+}
+
+/** Page builders other than Elementor / the block editor that are active on the site (name + version). */
+function livecrafts_profile_other_builders() {
+	$known = array(
+		'divi'       => array( 'Divi', array( 'ET_BUILDER_VERSION', 'ET_CORE_VERSION' ) ),
+		'beaver'     => array( 'Beaver Builder', array( 'FL_BUILDER_VERSION' ) ),
+		'wpbakery'   => array( 'WPBakery', array( 'WPB_VC_VERSION' ) ),
+		'bricks'     => array( 'Bricks', array( 'BRICKS_VERSION' ) ),
+		'oxygen'     => array( 'Oxygen', array( 'CT_VERSION' ) ),
+		'breakdance' => array( 'Breakdance', array( '__BREAKDANCE_VERSION' ) ),
+		'brizy'      => array( 'Brizy', array( 'BRIZY_VERSION' ) ),
+		'siteorigin' => array( 'SiteOrigin Page Builder', array( 'SITEORIGIN_PANELS_VERSION' ) ),
+		'thrive'     => array( 'Thrive Architect', array( 'TVE_VERSION' ) ),
+		'kadence'    => array( 'Kadence Blocks', array( 'KADENCE_BLOCKS_VERSION' ) ),
+		'spectra'    => array( 'Spectra', array( 'UAGB_VER' ) ),
+		'generateblocks' => array( 'GenerateBlocks', array( 'GENERATEBLOCKS_VERSION' ) ),
+	);
+	$out = array();
+	foreach ( $known as $id => $k ) {
+		foreach ( $k[1] as $const ) {
+			if ( defined( $const ) ) { $out[] = array( 'id' => $id, 'name' => $k[0], 'version' => (string) constant( $const ) ); break; }
+		}
+	}
+	if ( class_exists( 'Classic_Editor' ) || ( function_exists( 'use_block_editor_for_post_type' ) && ! use_block_editor_for_post_type( 'post' ) ) ) {
+		$out[] = array( 'id' => 'classic-editor', 'name' => 'Classic editor for posts', 'version' => '' );
+	}
+	return $out;
+}
+
+/**
+ * The theme's own brand: colour palette and font families from theme.json / Global Styles (block themes and modern
+ * classic themes), plus the site logo and name. Elementor's global colours / fonts are under builders.elementor.
+ */
+function livecrafts_profile_brand() {
+	$out = array( 'site' => get_bloginfo( 'name' ), 'tagline' => get_bloginfo( 'description' ), 'colors' => array(), 'fonts' => array(), 'logo' => '' );
+	if ( function_exists( 'wp_get_global_settings' ) ) {
+		$palette = wp_get_global_settings( array( 'color', 'palette' ) );
+		foreach ( array( 'custom', 'theme' ) as $origin ) { // the site owner's colours first
+			foreach ( (array) ( isset( $palette[ $origin ] ) ? $palette[ $origin ] : array() ) as $c ) {
+				if ( ! empty( $c['color'] ) && count( $out['colors'] ) < 12 ) $out['colors'][] = array( 'slug' => isset( $c['slug'] ) ? $c['slug'] : '', 'name' => isset( $c['name'] ) ? $c['name'] : '', 'value' => $c['color'] );
+			}
+		}
+		$fonts = wp_get_global_settings( array( 'typography', 'fontFamilies' ) );
+		foreach ( array( 'custom', 'theme' ) as $origin ) {
+			foreach ( (array) ( isset( $fonts[ $origin ] ) ? $fonts[ $origin ] : array() ) as $f ) {
+				if ( ! empty( $f['fontFamily'] ) && count( $out['fonts'] ) < 6 ) $out['fonts'][] = array( 'slug' => isset( $f['slug'] ) ? $f['slug'] : '', 'name' => isset( $f['name'] ) ? $f['name'] : '', 'family' => $f['fontFamily'] );
+			}
+		}
+	}
+	$logo = (int) get_theme_mod( 'custom_logo' );
+	if ( $logo ) $out['logo'] = (string) wp_get_attachment_url( $logo );
+	return $out;
+}
+
+/**
+ * How the site's existing blog posts are made (the 20 newest published): with which builder, and whether they use
+ * featured images. A new post Livecrafts writes is core block markup, which every theme and builder renders through
+ * its single-post template; this tells the assistant what the house style looks like.
+ */
+function livecrafts_profile_posts() {
+	$ids = get_posts( array( 'post_type' => 'post', 'post_status' => 'publish', 'numberposts' => 20, 'fields' => 'ids', 'suppress_filters' => true ) );
+	$by  = array( 'blocks' => 0, 'classic' => 0, 'elementor' => 0, 'divi' => 0, 'beaver' => 0, 'wpbakery' => 0, 'bricks' => 0, 'other_builder' => 0 );
+	$images = 0;
+	foreach ( $ids as $id ) {
+		$content = (string) get_post_field( 'post_content', $id, 'raw' );
+		if ( get_post_meta( $id, '_elementor_edit_mode', true ) === 'builder' ) $by['elementor']++;
+		elseif ( get_post_meta( $id, '_et_pb_use_builder', true ) === 'on' ) $by['divi']++;
+		elseif ( get_post_meta( $id, '_fl_builder_enabled', true ) ) $by['beaver']++;
+		elseif ( strpos( $content, '[vc_row' ) !== false ) $by['wpbakery']++;
+		elseif ( get_post_meta( $id, '_bricks_editor_mode', true ) === 'bricks' ) $by['bricks']++;
+		elseif ( get_post_meta( $id, 'ct_builder_shortcodes', true ) || get_post_meta( $id, '_breakdance_data', true ) ) $by['other_builder']++;
+		elseif ( function_exists( 'has_blocks' ) && has_blocks( $content ) ) $by['blocks']++;
+		else $by['classic']++;
+		if ( has_post_thumbnail( $id ) ) $images++;
+	}
+	return array( 'published' => (int) wp_count_posts( 'post' )->publish, 'sampled' => count( $ids ), 'built_with' => array_filter( $by ), 'with_featured_image' => $images );
 }
 
 /** Flexible-content layouts of every ACF field group: field, layout, sub fields. */

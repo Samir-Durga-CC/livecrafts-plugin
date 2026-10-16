@@ -97,6 +97,19 @@ foreach ( array( 'update_post_metadata', 'add_post_metadata' ) as $livecrafts_ho
 }
 unset( $livecrafts_hook );
 
+/*
+ * A NEW page / post Livecrafts created is a WordPress draft, which WordPress shows only to a logged-in editor. A
+ * preview token (a signed, short-lived, view-only pass for an editor) may open it too, so the automatic check can
+ * see the new post the way the theme / page builder renders it. Only drafts with an open post.create change qualify:
+ * any other draft or private post stays hidden.
+ */
+add_action( 'pre_get_posts', function ( $query ) {
+	if ( is_admin() || ! $query->is_main_query() || ! livecrafts_preview_token_request() ) return;
+	$id = (int) ( $query->get( 'p' ) ? $query->get( 'p' ) : $query->get( 'page_id' ) );
+	if ( ! $id || ! livecrafts_is_new_draft_post( $id ) ) return;
+	$query->set( 'post_status', array( 'publish', 'draft' ) );
+} );
+
 /* ------------------------------------------------------------------ title, content, excerpt */
 
 add_filter( 'the_posts', function ( $posts, $query ) {

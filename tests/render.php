@@ -7,7 +7,7 @@
  */
 
 if ( PHP_SAPI !== 'cli' || $argc < 4 ) exit( 1 );
-list( , $wp, $url, $user ) = $argv;
+list( , $lc_wp_path, $url, $user ) = $argv;
 $view  = $argv[4] ?? 'draft';
 $parts = parse_url( $url );
 $_SERVER['HTTP_HOST']      = $parts['host'] . ( isset( $parts['port'] ) ? ':' . $parts['port'] : '' );
@@ -18,7 +18,7 @@ if ( ( $parts['scheme'] ?? 'http' ) === 'https' ) $_SERVER['HTTPS'] = 'on';
 if ( $view === 'live' ) $_COOKIE['livecrafts_view'] = 'live';
 
 define( 'WP_USE_THEMES', true );
-require rtrim( $wp, '/\\' ) . '/wp-load.php';
+require rtrim( $lc_wp_path, '/\\' ) . '/wp-load.php';
 wp_set_current_user( (int) $user ); // who is looking, before WordPress handles the request
 wp();
 require ABSPATH . WPINC . '/template-loader.php';
