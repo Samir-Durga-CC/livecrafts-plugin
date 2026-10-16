@@ -11,11 +11,11 @@
  */
 
 if ( PHP_SAPI !== 'cli' ) exit( 1 );
-$wp = rtrim( $argv[1] ?? '', '/\\' );
-if ( ! $wp || ! file_exists( $wp . '/wp-load.php' ) ) { fwrite( STDERR, "Usage: php tests/integration.php <path to WordPress> [admin user id]\n" ); exit( 1 ); }
+$lc_wp_path = rtrim( $argv[1] ?? '', '/\\' );
+if ( ! $lc_wp_path || ! file_exists( $lc_wp_path . '/wp-load.php' ) ) { fwrite( STDERR, "Usage: php tests/integration.php <path to WordPress> [admin user id]\n" ); exit( 1 ); }
 $_SERVER['HTTP_HOST'] = $_SERVER['HTTP_HOST'] ?? 'localhost';
 define( 'WP_USE_THEMES', false );
-require $wp . '/wp-load.php';
+require $lc_wp_path . '/wp-load.php';
 
 $admin = (int) ( $argv[2] ?? 0 );
 if ( ! $admin ) { $admins = get_users( array( 'role' => 'administrator', 'number' => 1, 'fields' => 'ID' ) ); $admin = (int) ( $admins[0] ?? 0 ); }
@@ -36,10 +36,10 @@ function api( $method, $route, array $params = array(), array $headers = array()
 }
 /** Render a page in a fresh PHP process, as a logged-in editor ($user) or a visitor (0). */
 function render( $url, $user, $view = 'draft' ) {
-	global $wp;
+	global $lc_wp_path;
 	$cmd = escapeshellarg( PHP_BINARY ) . ' ' . implode( ' ', array_map( 'escapeshellarg', array_merge(
 		array( '-n', '-d', 'extension_dir=' . ini_get( 'extension_dir' ), '-d', 'extension=mysqli', '-d', 'extension=mbstring', '-d', 'mysqli.default_port=' . ini_get( 'mysqli.default_port' ) ),
-		array( __DIR__ . '/render.php', $wp, $url, (string) $user, $view )
+		array( __DIR__ . '/render.php', $lc_wp_path, $url, (string) $user, $view )
 	) ) );
 	return (string) shell_exec( $cmd );
 }

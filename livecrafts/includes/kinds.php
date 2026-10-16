@@ -391,10 +391,12 @@ function livecrafts_meta_allowed( $post_id ) {
 	$keys = array();
 	if ( post_type_supports( $type, 'thumbnail' ) ) $keys[] = '_thumbnail_id';
 	if ( $type === 'page' || post_type_supports( $type, 'page-attributes' ) || wp_get_theme()->get_page_templates( null, $type ) ) $keys[] = '_wp_page_template';
+	if ( is_post_type_viewable( $type ) ) $keys[] = 'seo_description';
 	return $keys;
 }
 
 function livecrafts_kind_post_meta_prepare( $post_id, $target, $value, array $draft ) {
+	if ( $target === livecrafts_seo_meta_key() ) $target = 'seo_description'; // the real key works too
 	$allowed = livecrafts_meta_allowed( $post_id );
 	if ( ! in_array( $target, $allowed, true ) ) {
 		return livecrafts_bad_value( $allowed ? 'This setting can be one of: ' . implode( ', ', $allowed ) . '.' : 'This item has no settings that can be changed here.' );
@@ -419,6 +421,12 @@ function livecrafts_kind_post_meta_prepare( $post_id, $target, $value, array $dr
 		case '_menu_item_target':
 			$clean = in_array( $value, array( '_blank', 'yes', '1', 'true' ), true ) ? '_blank' : '';
 			return array( 'target' => $target, 'after' => $clean, 'payload' => array(), 'summary' => 'Menu link “' . get_post_field( 'post_title', $post_id ) . '”: ' . ( $clean ? 'opens in a new tab' : 'opens in the same tab' ) );
+		case 'seo_description':
+			$key   = livecrafts_seo_meta_key();
+			$clean = livecrafts_seo_description_clean( $value );
+			$old   = isset( $draft['meta'][ $key ] ) ? (string) $draft['meta'][ $key ] : '';
+			if ( $clean === $old ) return array( 'unchanged' => true );
+			return array( 'target' => $key, 'after' => $clean, 'before' => $old, 'payload' => array(), 'summary' => 'SEO description: ' . livecrafts_quote( $old ? $old : '(none)' ) . ' → ' . livecrafts_quote( $clean ? $clean : '(none)' ) );
 	}
 	return livecrafts_bad_value( 'Unknown setting.' );
 }

@@ -102,7 +102,7 @@ Administrators have both, Editors get `livecrafts_edit`; give them to other role
 | Kind | Target | Value |
 |---|---|---|
 | `post.field` | `title` / `content` / `excerpt` / `status` | text |
-| `post.meta` | `_thumbnail_id`, `_wp_page_template`, menu links: `_menu_item_url`, `_menu_item_target` | id / template / url / yes |
+| `post.meta` | `_thumbnail_id`, `_wp_page_template`, `seo_description`, menu links: `_menu_item_url`, `_menu_item_target` | id / template / text / url / yes |
 | `acf.field` | ACF field key (top level) | value for the field type |
 | `acf.value` | meta name, e.g. `sections_0_title` (groups, rows) | value for the field type |
 | `acf.rows` | repeater / flexible content meta name | `{op: add\|remove\|move\|duplicate, index, to, layout}` |
@@ -112,6 +112,15 @@ Administrators have both, Editors get `livecrafts_edit`; give them to other role
 | `block.replace` / `block.insert` / `block.remove` / `block.move` / `block.duplicate` | path / `<parent path>:<index\|end>` | block markup / markup / count / `up`, `down`, index |
 | `css.rule` | (derived) | `{selector, media: ''\|desktop\|tablet\|mobile, declarations}` |
 | `css.block` | block name | CSS (no `!important`) |
+
+## Blog posts and SEO description (0.15)
+`POST /livecrafts/v1/pages` with `type: "post"` also takes `featured_media` (attachment id), `categories` and `tags`
+(names or ids; existing terms are matched by name or slug, missing ones are created if the person may manage them) and
+`meta_description`. They are set on the new post itself - it is a WordPress draft, so nobody sees them until deploy,
+and discarding the post moves all of it to the Trash (terms created for it stay, empty).
+The SEO description is stored where the site's SEO plugin reads it (Yoast, Rank Math, SEOPress, All in One SEO);
+without one, in `lc_meta_description`, printed as `<meta name="description">`. Later edits: `post.meta` target
+`seo_description` (a normal draft change). `site-profile` reports the SEO plugin.
 
 ## Testing
 Needs PHP and a **local** WordPress checkout (never a live site). `tests/integration.php` runs the whole flow against a **local** WordPress (it creates and deletes its own content):
