@@ -380,16 +380,25 @@
 		return fetch(url.href, { credentials: "same-origin", cache: "reload" })
 			.then(function (r) { return r.ok ? r.text() : Promise.reject(new Error("HTTP " + r.status)); })
 			.then(function (html) {
+				// Patching in place is only worth it on a page small enough to compare quickly. Comparing blocks means
+				// serialising each one, and on a builder page a single section can be megabytes - doing that every few
+				// seconds is what froze the tab. Past this size the person is offered a refresh instead.
+				if (html.length > 1500000) throw new Error("page too large to patch in place");
 				var doc = new DOMParser().parseFromString(html, "text/html");
 				var fresh = doc.body, live = document.body;
 				if (!fresh || !live) throw new Error("no body");
 				var a = Array.prototype.filter.call(live.children, keepable);
 				var b = Array.prototype.filter.call(fresh.children, keepable);
+				if (a.length > 80 || b.length > 80) throw new Error("too many blocks to patch in place");
 				var changed = 0;
 				if (a.length === b.length) {
-					// same shape: replace only the blocks whose markup differs
+					// same shape: replace only the blocks whose markup differs. The cheap signature (tag, id, class,
+					// child count, text length) is checked first, so the expensive comparison runs on few blocks.
 					for (var i = 0; i < a.length; i++) {
-						if (a[i].outerHTML !== b[i].outerHTML) { a[i].replaceWith(b[i].cloneNode(true)); changed++; }
+						if (sig(a[i]) === sig(b[i])) continue;
+						if (a[i].outerHTML === b[i].outerHTML) continue;
+						a[i].replaceWith(b[i].cloneNode(true));
+						changed++;
 					}
 				} else {
 					// a section was added or removed: rebuild the page's blocks, keeping everything of ours
@@ -409,6 +418,12 @@
 				// Could not patch it in place: say so, and let the person refresh when they want to.
 				send({ type: "lc:refreshed", changed: 0, soft: false, error: e && e.message ? e.message : String(e) });
 			});
+	}
+
+	/** A cheap fingerprint of a block: enough to tell "certainly unchanged" without serialising the whole subtree. */
+	function sig(el) {
+		return el.tagName + "|" + (el.id || "") + "|" + (el.className || "") + "|" +
+			el.childElementCount + "|" + (el.textContent ? el.textContent.length : 0);
 	}
 
 	/** Our own chrome is never touched by a soft refresh (the chat, the draft bar, the picker overlays). */
@@ -460,7 +475,22 @@
 		} catch (e) { /* a page we may not touch: the filters below still apply */ }
 	}
 
+	/**
+	 * One look at a time.
+	 *
+	 * Every look loads the whole page again in a hidden frame - with the builder's own scripts, fonts and images.
+	 * Two of those at once, on top of the page the person is reading, is what made the tab stop responding. They now
+	 * queue, so the browser is only ever rendering one extra copy.
+	 */
+	var probeQueue = Promise.resolve();
 	function withDoc(args, fn) {
+		var run = function () { return withDocNow(args, fn); };
+		var next = probeQueue.then(run, run);
+		probeQueue = next.then(function () {}, function () {}); // the queue never inherits a rejection
+		return next;
+	}
+
+	function withDocNow(args, fn) {
 		var device = args.device || deviceOf(window.innerWidth);
 		// Always look at a FRESH copy of the page (a hidden frame, cache-busted): the tab the person has open was loaded before the
 		// assistant's changes and would show the old look.
