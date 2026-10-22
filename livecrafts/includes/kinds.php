@@ -282,7 +282,16 @@ function livecrafts_kind_el_prepare( $post_id, $target, $value, array $draft ) {
 	$controls = livecrafts_el_controls( $node );
 	if ( ! $controls ) return livecrafts_bad_value( 'Elementor does not know this element type (the add-on that provides it may be inactive).' );
 	$usable = function ( $c ) { return isset( $c['type'] ) && in_array( $c['type'], livecrafts_el_control_types(), true ); };
-	if ( ! isset( $controls[ $name ] ) || ! $usable( $controls[ $name ] ) ) {
+	// A per-breakpoint override ("..._mobile", "..._tablet"): Elementor reads those keys when it renders the page,
+	// but a GROUP control (typography, border, box-shadow ...) does not list its own per-breakpoint variants in
+	// get_controls(). Check such a value against the base control's definition rather than refusing a setting
+	// Elementor itself supports - otherwise "make the heading smaller on mobile" has no native path and falls back
+	// to custom CSS. livecrafts_el_toggles() already understands the suffix.
+	$def = $name;
+	if ( ! isset( $controls[ $def ] ) && preg_match( '/^(.+?)_(widescreen|laptop|tablet_extra|tablet|mobile_extra|mobile)$/', $name, $r ) && isset( $controls[ $r[1] ] ) ) {
+		$def = $r[1];
+	}
+	if ( ! isset( $controls[ $def ] ) || ! $usable( $controls[ $def ] ) ) {
 		$names = array_keys( array_filter( $controls, $usable ) );
 		return livecrafts_bad_value( livecrafts_el_label( $node ) . ' has no setting "' . $name . '" that can be changed here. Its settings include: ' . implode( ', ', array_slice( $names, 0, 40 ) ) . '.' );
 	}
@@ -292,15 +301,15 @@ function livecrafts_kind_el_prepare( $post_id, $target, $value, array $draft ) {
 		$clean = esc_url_raw( (string) $value );
 		if ( $clean === '' && (string) $value !== '' ) return livecrafts_bad_value( 'Not a valid address.' );
 	} else {
-		$clean = livecrafts_el_value( $controls[ $name ], $value, isset( $settings[ $name ] ) ? $settings[ $name ] : null, $name );
+		$clean = livecrafts_el_value( $controls[ $def ], $value, isset( $settings[ $name ] ) ? $settings[ $name ] : null, $name );
 		if ( is_wp_error( $clean ) ) return $clean;
 	}
-	$what = livecrafts_el_label( $node ) . ' › ' . wp_strip_all_tags( isset( $controls[ $name ]['label'] ) && $controls[ $name ]['label'] !== '' ? $controls[ $name ]['label'] : $name );
+	$what = livecrafts_el_label( $node ) . ' › ' . wp_strip_all_tags( isset( $controls[ $def ]['label'] ) && $controls[ $def ]['label'] !== '' ? $controls[ $def ]['label'] : $def );
 	if ( preg_match( '/_(tablet|mobile|widescreen|laptop|tablet_extra|mobile_extra)$/', $name, $d ) ) $what .= ' (' . str_replace( '_', ' ', $d[1] ) . ')';
 	return array(
 		'target'  => $target,
 		'after'   => $clean,
-		'payload' => array( 'widget' => isset( $node['widgetType'] ) ? $node['widgetType'] : $node['elType'], 'control' => $controls[ $name ]['type'], 'also' => livecrafts_el_toggles( $controls, $settings, $name ) ),
+		'payload' => array( 'widget' => isset( $node['widgetType'] ) ? $node['widgetType'] : $node['elType'], 'control' => $controls[ $def ]['type'], 'also' => livecrafts_el_toggles( $controls, $settings, $name ) ),
 		'summary' => 'Elementor ' . $what . ': ' . livecrafts_quote( $current === null ? '(default)' : $current ) . ' → ' . livecrafts_quote( $clean === '' ? '(default)' : $clean ),
 	);
 }
