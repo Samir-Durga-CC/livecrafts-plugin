@@ -62,6 +62,9 @@ function livecrafts_rest_resolve( WP_REST_Request $req ) {
 		}
 		if ( ! $r ) $r = livecrafts_resolve_block( (int) $m[1], $m[2], $device );
 	}
+	if ( ! $r && preg_match( '/^(\d+):(\d{1,4}(?:\.\d{1,4}){0,9})$/', (string) $req->get_param( 'divi' ), $m ) && current_user_can( 'edit_post', (int) $m[1] ) ) {
+		$r = livecrafts_resolve_divi( (int) $m[1], $m[2], $device, (string) $req->get_param( 'selector' ), (string) $req->get_param( 'tag' ) );
+	}
 	if ( ! $r && $page && current_user_can( 'edit_post', $page ) ) {
 		$r = livecrafts_resolve_acf( $page, $req );
 	}
@@ -306,6 +309,57 @@ function livecrafts_resolve_block( $post, $path, $device ) {
 		$out['parent'] = array( 'label' => $p ? livecrafts_block_label( $p ) : 'Parent block', 'block' => $post . ':' . $parent );
 	}
 	return $out;
+}
+
+/* ------------------------------------------------------------------ Divi modules */
+
+/**
+ * A Divi module the person clicked (found by the module_class="lcd-<path>" marker).
+ * Content actions come from the module's own fields; the look is changed with a style rule on the clicked element,
+ * because Divi keeps its design in the shortcode's own attributes and those are not safe to rewrite from a click.
+ */
+function livecrafts_resolve_divi( $post, $path, $device, $selector, $tag ) {
+	$data = livecrafts_draft_data( 'post', $post );
+	if ( is_wp_error( $data ) ) return null;
+	$content = (string) $data['fields']['content'];
+	$node    = livecrafts_divi_get( livecrafts_divi_tree( $content ), $path );
+	if ( ! $node ) return null;
+
+	$label   = livecrafts_divi_label( $node );
+	$actions = array();
+	$notes   = array();
+	$change  = function ( $kind, $field ) use ( $post, $path ) { return array( 'kind' => $kind, 'post' => $post, 'target' => $path . ':' . $field ); };
+
+	foreach ( livecrafts_divi_fields_for( 'text', $node ) as $field ) {
+		$value = livecrafts_divi_field_value( $content, $node, $field );
+		$what  = $field === 'text' ? 'text' : str_replace( '_', ' ', $field );
+		// A Divi Text module is one rich-text field in Divi's own editor too, so its whole content is what gets edited.
+		$actions[] = livecrafts_action( 'divi:' . $field, 'content', 'Edit ' . $what, $field === 'text' ? 'html' : 'text', $value, $change( 'divi.text', $field ) );
+	}
+	foreach ( livecrafts_divi_fields_for( 'link', $node ) as $field ) {
+		$value = livecrafts_divi_field_value( $content, $node, $field );
+		$actions[] = livecrafts_action( 'divi-link:' . $field, 'content', 'Change ' . str_replace( '_', ' ', $field ), 'url', $value, $change( 'divi.link', $field ) );
+	}
+
+	$clean = livecrafts_css_selector_clean( $selector );
+	if ( $clean !== '' && current_user_can( 'edit_css' ) ) {
+		$actions = array_merge( $actions, livecrafts_css_actions( $clean, $device, $tag !== '' ? $tag : $label ) );
+	} elseif ( $clean !== '' ) {
+		$notes[] = 'Your account cannot change the site CSS.';
+	}
+	if ( ! livecrafts_divi_fields_for( 'text', $node ) && ! livecrafts_divi_fields_for( 'link', $node ) ) {
+		$notes[] = livecrafts_divi_is_layout( $node )
+			? 'This is a Divi ' . strtolower( $label ) . ': a layout wrapper. Click the text or image inside it to change content, or use a style rule here.'
+			: 'Livecrafts cannot edit the content of a Divi ' . strtolower( $label ) . ' module yet. Its look can still be changed with a style rule; for its content use the Divi editor or ask the assistant.';
+	}
+	$notes[] = 'Divi keeps this module\'s own colours and sizes in the page content; those win over style rules for the same property. Change them in the Divi editor, or ask the assistant.';
+
+	return array(
+		'source'  => array( 'kind' => 'divi', 'label' => $label, 'post' => $post, 'path' => $path, 'type' => $node['tag'],
+			'where' => livecrafts_object_label( 'post', $post ), 'edit_link' => get_edit_post_link( $post, 'raw' ) ),
+		'actions' => $actions,
+		'notes'   => $notes,
+	);
 }
 
 /* ------------------------------------------------------------------ ACF values printed by the theme */

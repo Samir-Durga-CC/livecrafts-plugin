@@ -4,8 +4,11 @@
  * Params: heading, items [ name, image, url ]  (no image: the name is shown as a wordmark)
  * Shortcode: [ai_logo_cloud heading="Trusted by teams at"][ai_item name="Acme" image=""]...[/ai_logo_cloud]
  */
+$items = ai_items( $args );
+if ( ! $items ) {
+	return;
+}
 $heading = $args['heading'] ?? '';
-$items   = ai_items( $args );
 ?>
 <section class="ai-c bg-surface py-12 sm:py-16">
   <div class="mx-auto max-w-wide px-4 sm:px-6 lg:px-8">
@@ -16,9 +19,9 @@ $items   = ai_items( $args );
       <?php foreach ( $items as $item ) : ?>
       <li class="m-0 flex justify-center p-0">
         <?php if ( ! empty( $item['image'] ) ) : ?>
-        <img alt="<?php echo esc_attr( $item['name'] ?? '' ); ?>" src="<?php echo esc_url( $item['image'] ); ?>" class="block h-8 w-auto max-w-full object-contain opacity-60 grayscale transition hover:opacity-100 hover:grayscale-0" />
+        <img alt="<?php echo esc_attr( $item['name'] ?? '' ); ?>" src="<?php echo esc_url( $item['image'] ); ?>" class="block h-8 w-auto max-w-full object-contain opacity-70 grayscale transition duration-200 hover:opacity-100 hover:grayscale-0" />
         <?php else : ?>
-        <span class="text-xl font-bold tracking-tight text-gray-400"><?php echo esc_html( $item['name'] ?? '' ); ?></span>
+        <span class="text-xl font-bold tracking-tight text-subtle"><?php echo esc_html( $item['name'] ?? '' ); ?></span>
         <?php endif; ?>
       </li>
       <?php endforeach; ?>

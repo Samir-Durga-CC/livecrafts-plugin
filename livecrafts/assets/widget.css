@@ -105,3 +105,7 @@ html.lcw-media-open .uploader-window { z-index: 2147483005; }
   .lcw-db-text { display: none; }
 }
 @media (max-width: 520px) { .lcw-open .lcw-draftbar { display: none; } } /* the chat is full screen on phones: the bar must not cover it */
+.lcw-offline > b { font-size: 16px; }
+.lcw-offline ol { margin: 4px 0 0; padding-left: 20px; text-align: left; max-width: 320px; font-size: 13px; }
+.lcw-offline ol li { margin: 0 0 6px; }
+.lcw-offline .lcw-off-note { color: #667085; font-size: 12.5px; }

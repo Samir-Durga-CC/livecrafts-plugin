@@ -10,7 +10,7 @@ $text  = $args['text'] ?? '';
 $label = $args['label'] ?? '';
 $url   = $args['url'] ?? '#';
 ?>
-<div class="ai-c rounded-card border border-dashed border-gray-300 bg-surface px-6 py-14 text-center">
+<div class="ai-c rounded-card border border-dashed border-line bg-surface px-6 py-14 text-center">
   <span class="mx-auto flex size-12 items-center justify-center rounded-full bg-brand-50 text-brand-600"><?php ai_e_icon( $icon, 6 ); ?></span>
   <h3 class="mt-4 mb-0 text-base font-semibold text-ink"><?php echo esc_html( $title ); ?></h3>
   <?php if ( $text ) : ?>

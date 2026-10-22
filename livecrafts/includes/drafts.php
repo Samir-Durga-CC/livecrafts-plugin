@@ -269,7 +269,7 @@ function livecrafts_page_create( array $a, array $opts = array() ) {
 		'summary' => 'New ' . $type . ' “' . $title . '”', 'payload' => array( 'type' => $type, 'title' => $title ),
 		'ref' => isset( $opts['ref'] ) ? $opts['ref'] : '',
 	) );
-	$out = array( 'ok' => true, 'id' => (int) $id, 'preview' => get_preview_post_link( $id ), 'change' => livecrafts_change_public( livecrafts_change_get( $cid ) ) );
+	$out = array( 'ok' => true, 'id' => (int) $id, 'preview' => get_preview_post_link( $id ), 'edit' => admin_url( 'post.php?post=' . (int) $id . '&action=edit' ), 'change' => livecrafts_change_public( livecrafts_change_get( $cid ) ) );
 	if ( $image ) $out['featured_media'] = array( 'id' => $image, 'url' => wp_get_attachment_url( $image ), 'alt' => (string) get_post_meta( $image, '_wp_attachment_image_alt', true ) );
 	foreach ( $terms as $tax => $r ) $out[ $tax === 'category' ? 'categories' : 'tags' ] = $r['used'];
 	if ( $description !== '' ) $out['seo'] = array( 'plugin' => livecrafts_seo_plugin(), 'meta_key' => livecrafts_seo_meta_key(), 'description' => $description );

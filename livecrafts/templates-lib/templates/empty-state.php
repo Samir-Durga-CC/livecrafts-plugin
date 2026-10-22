@@ -10,7 +10,7 @@ $text  = $args['text'] ?? '';
 $label = $args['label'] ?? '';
 $url   = $args['url'] ?? '#';
 ?>
-<div class="ai-c ai:rounded-card ai:border ai:border-dashed ai:border-gray-300 ai:bg-surface ai:px-6 ai:py-14 ai:text-center">
+<div class="ai-c ai:rounded-card ai:border ai:border-dashed ai:border-line ai:bg-surface ai:px-6 ai:py-14 ai:text-center">
   <span class="ai:mx-auto ai:flex ai:size-12 ai:items-center ai:justify-center ai:rounded-full ai:bg-brand-50 ai:text-brand-600"><?php ai_e_icon( $icon, 6 ); ?></span>
   <h3 class="ai:mt-4 ai:mb-0 ai:text-base ai:font-semibold ai:text-ink"><?php echo esc_html( $title ); ?></h3>
   <?php if ( $text ) : ?>

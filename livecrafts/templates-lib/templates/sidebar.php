@@ -16,8 +16,8 @@ $search_action = $args['search_action'] ?? '';
   <?php if ( $search_action ) : ?>
   <form action="<?php echo esc_url( $search_action ); ?>" method="get" role="search" class="ai:relative ai:m-0">
     <label for="ai-sb-search" class="ai:sr-only">Search</label>
-    <span class="ai:pointer-events-none ai:absolute ai:inset-y-0 ai:left-3 ai:flex ai:items-center ai:text-gray-400"><?php ai_e_icon( 'search', 5 ); ?></span>
-    <input id="ai-sb-search" type="search" name="s" placeholder="Search" class="ai:block ai:w-full ai:rounded-lg ai:border-0 ai:bg-surface ai:py-3 ai:pr-4 ai:pl-10 ai:text-sm ai:text-ink ai:shadow-sm ai:ring-1 ai:ring-inset ai:ring-gray-300 ai:placeholder:text-gray-400 ai:focus:ring-2 ai:focus:ring-brand-600 ai:focus:outline-none" />
+    <span class="ai:pointer-events-none ai:absolute ai:inset-y-0 ai:left-3 ai:flex ai:items-center ai:text-subtle"><?php ai_e_icon( 'search', 5 ); ?></span>
+    <input id="ai-sb-search" type="search" name="s" placeholder="Search" class="ai:block ai:w-full ai:rounded-lg ai:border-0 ai:bg-surface ai:py-3 ai:pr-4 ai:pl-10 ai:text-sm ai:text-ink ai:shadow-sm ai:ring-1 ai:ring-inset ai:ring-line ai:placeholder:text-subtle ai:focus:ring-2 ai:focus:ring-brand-600 ai:focus:outline-none" />
   </form>
   <?php endif; ?>
 
@@ -30,7 +30,7 @@ $search_action = $args['search_action'] ?? '';
       <li class="ai:m-0 ai:p-0">
         <a href="<?php echo esc_url( $item['url'] ?? '#' ); ?>" class="<?php echo esc_attr( ai_cls( 'ai:flex ai:items-center ai:justify-between ai:rounded-lg ai:px-3 ai:py-2 ai:text-sm ai:font-medium ai:no-underline ai:transition-colors' ) . ' ' . ( ! empty( $item['current'] ) ? ai_cls( 'ai:bg-brand-50 ai:text-brand-700' ) : ai_cls( 'ai:text-muted ai:hover:bg-surface-alt ai:hover:text-ink' ) ) ); ?>">
           <span><?php echo esc_html( $item['label'] ?? '' ); ?></span>
-          <span class="ai:text-gray-400"><?php ai_e_icon( 'chevron-right', 4 ); ?></span>
+          <span class="ai:text-subtle"><?php ai_e_icon( 'chevron-right', 4 ); ?></span>
         </a>
       </li>
       <?php endforeach; ?>

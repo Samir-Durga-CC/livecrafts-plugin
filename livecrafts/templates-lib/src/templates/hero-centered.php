@@ -1,36 +1,35 @@
 <?php
 /**
- * Component: hero-centered
- * Params: eyebrow, heading, text, primary_label, primary_url, secondary_label, secondary_url, note
- * Shortcode: [ai_hero_centered eyebrow="" heading="" text="" primary_label="" primary_url="" secondary_label="" secondary_url="" note=""]
+ * Component: hero-centered (the opening of a page, message only)
+ * Params: eyebrow, heading, text, note, primary_label, primary_url, secondary_label, secondary_url, items [ title, text ]
+ * Shortcode: [ai_hero_centered eyebrow="" heading="" text="" primary_label="" primary_url="" note=""]
+ *
+ * For a page whose opening is a statement rather than a picture: an about page, a help centre, a policy page.
+ * With items it also shows the figures that back the statement. For a picture beside the message use [ai_hero].
  */
-$eyebrow = $args['eyebrow'] ?? '';
-$heading = $args['heading'] ?? '';
-$text    = $args['text'] ?? '';
-$note    = $args['note'] ?? '';
+$items = ai_items( $args );
 ?>
-<section class="ai-c relative isolate overflow-hidden bg-surface">
-  <div class="absolute inset-x-0 top-0 -z-10 h-72 bg-linear-to-b from-brand-50 to-white" aria-hidden="true"></div>
-  <div class="mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8 py-sec-sm sm:py-sec">
-    <?php if ( $eyebrow ) : ?>
-    <p class="mb-6 mt-0 inline-flex items-center rounded-full bg-surface px-3 py-1 text-sm font-medium text-brand-700 shadow-sm ring-1 ring-inset ring-brand-200"><?php echo esc_html( $eyebrow ); ?></p>
-    <?php endif; ?>
-    <h1 class="m-0 text-4xl font-bold tracking-tight text-balance text-ink sm:text-6xl"><?php echo esc_html( $heading ); ?></h1>
-    <?php if ( $text ) : ?>
-    <p class="mx-auto mt-6 mb-0 max-w-2xl text-lg/8 text-pretty text-muted"><?php echo esc_html( $text ); ?></p>
-    <?php endif; ?>
-    <div class="mt-10 flex flex-wrap items-center justify-center gap-3">
-      <?php
-      if ( ! empty( $args['primary_label'] ) ) {
-	      ai_component( 'button', array( 'label' => $args['primary_label'], 'url' => $args['primary_url'] ?? '#', 'size' => 'lg' ) );
-      }
-      if ( ! empty( $args['secondary_label'] ) ) {
-	      ai_component( 'button', array( 'label' => $args['secondary_label'], 'url' => $args['secondary_url'] ?? '#', 'size' => 'lg', 'variant' => 'outline', 'icon' => 'none' ) );
-      }
-      ?>
+<section class="ai-c relative overflow-hidden bg-surface py-sec-sm sm:py-sec">
+  <!-- a soft brand light behind the heading: depth with nothing extra to load -->
+  <div class="pointer-events-none absolute -top-48 left-1/2 size-[40rem] -translate-x-1/2 rounded-full bg-brand-50 opacity-70 blur-3xl" aria-hidden="true"></div>
+  <div class="relative mx-auto max-w-wide px-4 text-center sm:px-6 lg:px-8">
+    <div class="mx-auto max-w-3xl">
+      <?php ai_component( 'part-head', array_merge( $args, array( 'level' => 'h1' ) ) ); ?>
     </div>
-    <?php if ( $note ) : ?>
-    <p class="mt-6 mb-0 text-sm text-subtle"><?php echo esc_html( $note ); ?></p>
+    <?php ai_component( 'part-actions', $args ); ?>
+    <?php if ( ! empty( $args['note'] ) ) : ?>
+    <p class="m-0 mt-6 text-sm text-subtle"><?php echo esc_html( $args['note'] ); ?></p>
+    <?php endif; ?>
+
+    <?php if ( $items ) : ?>
+    <dl class="mx-auto m-0 mt-16 grid max-w-3xl gap-10 border-t border-line pt-10 sm:grid-cols-3">
+      <?php foreach ( $items as $item ) : ?>
+      <div class="m-0">
+        <dt class="m-0 text-3xl font-bold tracking-tight text-ink sm:text-4xl"><?php echo esc_html( $item['title'] ?? '' ); ?></dt>
+        <dd class="m-0 mt-1 text-sm text-muted"><?php echo esc_html( $item['text'] ?? '' ); ?></dd>
+      </div>
+      <?php endforeach; ?>
+    </dl>
     <?php endif; ?>
   </div>
 </section>

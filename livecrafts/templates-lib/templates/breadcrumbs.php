@@ -13,7 +13,7 @@ $last  = count( $items ) - 1;
     <li class="ai:m-0 ai:flex ai:items-center ai:gap-2 ai:p-0">
       <?php if ( $i < $last && ! empty( $item['url'] ) ) : ?>
       <a href="<?php echo esc_url( $item['url'] ); ?>" class="ai:font-medium ai:text-muted ai:no-underline ai:hover:text-brand-700"><?php echo esc_html( $item['label'] ?? '' ); ?></a>
-      <span class="ai:text-gray-400"><?php ai_e_icon( 'chevron-right', 4 ); ?></span>
+      <span class="ai:text-subtle"><?php ai_e_icon( 'chevron-right', 4 ); ?></span>
       <?php else : ?>
       <span aria-current="page" class="ai:font-medium ai:text-ink"><?php echo esc_html( $item['label'] ?? '' ); ?></span>
       <?php endif; ?>

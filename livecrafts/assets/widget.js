@@ -41,11 +41,13 @@
 	var frame = null;
 	var hint = document.createElement("div");
 	hint.className = "lcw-pickhint";
+	hint.setAttribute("data-livecrafts", "pickhint");
 	hint.innerHTML = "<b>Pick an element</b> - click anything on the page. <kbd>Esc</kbd> to cancel.";
 	hint.hidden = true;
 
 	var box = document.createElement("div");
 	box.className = "lcw-hoverbox";
+	box.setAttribute("data-livecrafts", "hoverbox");
 	box.hidden = true;
 	var tag = document.createElement("span");
 	tag.className = "lcw-hovertag";
@@ -83,20 +85,40 @@
 			var isLocal = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(backendOrigin);
 			var err = document.createElement("div");
 			err.className = "lcw-offline";
-			err.innerHTML = "<b>Cannot reach the Livecrafts app.</b>" +
-				(isLocal ? "<p>1. Is it running? Start it with <code>npm start</code> (it should say <code>" + escapeHtml(C.backend) + "</code>).</p>" +
-					"<p>2. Did the browser ask to <b>“access other apps and services on this device”</b>? Click <b>Allow</b>. If you closed it: click the icon left of the address bar → Site settings → <b>Local network access</b> → Allow.</p>"
-					: "<p>Check that the Livecrafts app is online at <code>" + escapeHtml(C.backend) + "</code>.</p>") +
-				'<button type="button" class="lcw-retry">Try again</button>';
+			err.setAttribute("role", "alert");
+			err.innerHTML = "<b>Livecrafts is not running</b>" +
+				(isLocal
+					? "<p>The Livecrafts app runs on one computer and this widget only works on that computer.</p>" +
+					  "<ol><li>On that computer, double-click <b>start-livecrafts.bat</b> (in the <code>livecrafts-backend</code> folder) and keep its black window open.</li>" +
+					  "<li>Wait until it says <code>Starting at " + escapeHtml(C.backend) + "</code>.</li>" +
+					  "<li>If the browser asks to <b>“access other apps and services on this device”</b>, click <b>Allow</b>. (Closed it? Click the icon left of the address bar → Site settings → Local network access → Allow.)</li></ol>" +
+					  "<p class=\"lcw-off-note\">This panel reconnects by itself as soon as the app is running.</p>"
+					: "<p>The Livecrafts app at <code>" + escapeHtml(C.backend) + "</code> does not answer. Check that it is online, then try again.</p>") +
+				'<button type="button" class="lcw-retry">Try again now</button>';
 			err.hidden = true;
 			panel.appendChild(err);
 			panel.appendChild(frame);
 			// The chat says "lc:ready" when it loaded; if it never does, the app is not running (or blocked).
-			var ready = false;
-			var watch = function () { setTimeout(function () { if (!ready) err.hidden = false; }, 8000); };
+			// A quick probe shows the message at once when nothing listens, then keeps checking and reconnects by itself.
+			var ready = false, probeTimer = null;
+			var probe = function () {
+				return fetch(backendOrigin + "/health", { mode: "no-cors", cache: "no-store" }).then(function () { return true; }, function () { return false; });
+			};
+			var reconnect = function () {
+				clearInterval(probeTimer);
+				probeTimer = setInterval(function () {
+					if (ready) { clearInterval(probeTimer); return; }
+					probe().then(function (up) { if (up && !ready) { frame.src = frameUrl(); setTimeout(function () { if (ready) err.hidden = true; }, 3000); } });
+				}, 5000);
+			};
+			var showError = function () { if (!ready) { err.hidden = false; reconnect(); } };
+			var watch = function () {
+				probe().then(function (up) { if (!up) setTimeout(showError, 1500); });
+				setTimeout(showError, 9000);
+			};
 			watch();
 			err.querySelector(".lcw-retry").addEventListener("click", function () { err.hidden = true; frame.src = frameUrl(); watch(); });
-			window.addEventListener("message", function (e) { if (e.origin === backendOrigin && e.data && e.data.type === "lc:ready") { ready = true; err.hidden = true; } });
+			window.addEventListener("message", function (e) { if (e.origin === backendOrigin && e.data && e.data.type === "lc:ready") { ready = true; err.hidden = true; clearInterval(probeTimer); } });
 		}
 		panel.hidden = false;
 		root.classList.add("lcw-open");
@@ -128,7 +150,7 @@
 		document.removeEventListener("keydown", onKey, true);
 		send({ type: "lc:pick-ended" });
 	}
-	function inWidget(el) { return !!(el && el.closest && (el.closest("[data-livecrafts]") || el === box || el === hint || box.contains(el))); }
+	function inWidget(el) { return !!(el && el.closest && (el.closest(CHROME) || el === box || el === hint || box.contains(el))); }
 	function onMove(e) {
 		var el = targetAt(e.clientX, e.clientY);
 		if (!el) { box.hidden = true; hovered = null; return; }
@@ -182,12 +204,22 @@
 	function resolve(snap) {
 		return wp("POST", "resolve", {
 			page: Number(C.postId) || 0, device: deviceOf(window.innerWidth), elementor: snap.elementor ? { doc: snap.elementor.post, id: snap.elementor.id } : null,
-			block: snap.block || "", menuItem: snap.menuItem || 0, tag: snap.tag, text: snap.rawText || snap.text,
+			block: snap.block || "", divi: snap.divi || "", menuItem: snap.menuItem || 0, tag: snap.tag, text: snap.rawText || snap.text,
 			imageSrc: snap.image ? snap.image.src : "", bgImage: snap.bgImage || "", href: snap.link || "", selector: snap.selector,
 		});
 	}
 	/** The block of the page content this element belongs to ("<post>:<path>", only on pages Livecrafts marked for editors). */
 	function blockOf(el) { var b = el.closest && el.closest("[data-lc-block]"); return b ? b.getAttribute("data-lc-block") : ""; }
+	/**
+	 * The Divi module this element belongs to ("<post>:<path>"). Divi has no id of its own on the page, so for editors
+	 * Livecrafts gives every module the class lcd-<path with dashes> (see divi.php). The NEAREST one wins, so a click
+	 * inside a Text module finds that module and not the row or section around it.
+	 */
+	function diviOf(el) {
+		var d = el.closest && el.closest("[class*='lcd-']");
+		var m = d && /(?:^|\s)lcd-(\d+(?:-\d+)*)(?:\s|$)/.exec(d.className || "");
+		return m ? (Number(C.postId) || 0) + ":" + m[1].split("-").join(".") : "";
+	}
 	/** The classic menu link this element belongs to (WordPress puts menu-item-<id> on each item). */
 	function menuItemOf(el) {
 		var li = el.closest && el.closest("li[class*='menu-item-']");
@@ -225,7 +257,7 @@
 			link: el.closest && el.closest("a") ? el.closest("a").href : "",
 			styles: styles, rect: { width: Math.round(r.width), height: Math.round(r.height) },
 			section: sectionOf(el), pageUrl: location.href.split("#")[0].replace(/[?&]lcv=\d+/, ""), viewport: window.innerWidth,
-			pageKey: C.pageKey || "", elementor: elementorOf(el), hasChildren: hasMarkup(el), block: blockOf(el), menuItem: menuItemOf(el),
+			pageKey: C.pageKey || "", elementor: elementorOf(el), hasChildren: hasMarkup(el), block: blockOf(el), divi: diviOf(el), menuItem: menuItemOf(el),
 			similarSelector: similar.selector, similarCount: similar.count,
 		};
 	}
@@ -281,6 +313,7 @@
 		else if (d.type === "lc:highlight" && d.selector) {
 			try { var el = document.querySelector(d.selector); if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); outline(el); setTimeout(function () { if (!picking) box.hidden = true; }, 1800); } } catch (x) { /* bad selector */ }
 		}
+		else if (d.type === "lc:soft-refresh") { softRefresh(d.selector); }
 		else if (d.type === "lc:reload") {
 			// show the change like Ctrl+Shift+R: refresh this site's cached CSS/JS first, then reload; keep the panel open
 			state.open = true; state.tab = d.tab || state.tab; save();
@@ -306,7 +339,7 @@
 		var els = [];
 		try { els = Array.prototype.slice.call(document.querySelectorAll(selector), 0, 200); } catch (e) { return; }
 		els.forEach(function (el) {
-			if (el.closest("[data-livecrafts]")) return;
+			if (el.closest(CHROME)) return;
 			previewed.push({ el: el, style: el.getAttribute("style") || "" });
 			Object.keys(styles).forEach(function (k) { if (styles[k]) el.style.setProperty(k, styles[k], "important"); });
 		});
@@ -353,6 +386,56 @@
 		send({ type: "lc:text-edited", selector: ed.selector, oldText: ed.oldText, newText: newText });
 	}
 
+	/**
+	 * Show what changed WITHOUT reloading the page.
+	 *
+	 * The page is fetched again in the background and compared with what is on screen, section by section; only the
+	 * parts that actually differ are swapped in. Nothing else moves: no white flash, no lost scroll position, no
+	 * menu or slider re-initialising. If anything about it fails, the person is offered a normal refresh instead -
+	 * it never leaves a half-updated page.
+	 */
+	function softRefresh(selector) {
+		var url = new URL(location.href);
+		url.searchParams.set("lcfresh", String(Date.now()));
+		return fetch(url.href, { credentials: "same-origin", cache: "reload" })
+			.then(function (r) { return r.ok ? r.text() : Promise.reject(new Error("HTTP " + r.status)); })
+			.then(function (html) {
+				var doc = new DOMParser().parseFromString(html, "text/html");
+				var fresh = doc.body, live = document.body;
+				if (!fresh || !live) throw new Error("no body");
+				var a = Array.prototype.filter.call(live.children, keepable);
+				var b = Array.prototype.filter.call(fresh.children, keepable);
+				var changed = 0;
+				if (a.length === b.length) {
+					// same shape: replace only the blocks whose markup differs
+					for (var i = 0; i < a.length; i++) {
+						if (a[i].outerHTML !== b[i].outerHTML) { a[i].replaceWith(b[i].cloneNode(true)); changed++; }
+					}
+				} else {
+					// a section was added or removed: rebuild the page's blocks, keeping everything of ours
+					for (var j = 0; j < a.length; j++) a[j].remove();
+					var at = live.firstChild;
+					for (var k = 0; k < b.length; k++) live.insertBefore(b[k].cloneNode(true), at);
+					changed = Math.abs(b.length - a.length) + 1;
+				}
+				if (changed && selector) {
+					var el = document.querySelector(selector);
+					if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); outline(el); }
+				}
+				send({ type: "lc:refreshed", changed: changed, soft: true });
+				return changed;
+			})
+			.catch(function (e) {
+				// Could not patch it in place: say so, and let the person refresh when they want to.
+				send({ type: "lc:refreshed", changed: 0, soft: false, error: e && e.message ? e.message : String(e) });
+			});
+	}
+
+	/** Our own chrome is never touched by a soft refresh (the chat, the draft bar, the picker overlays). */
+	function keepable(el) {
+		return !el.hasAttribute("data-livecrafts") && el.tagName !== "SCRIPT" && el.tagName !== "NOSCRIPT" && el.id !== "wpadminbar";
+	}
+
 	/** Like Ctrl+Shift+R: re-download this site's stylesheets/scripts into the browser cache, then reload. */
 	function hardReload() {
 		var urls = [];
@@ -377,6 +460,26 @@
 		if (!url) return true;
 		try { var u = new URL(url, location.href); return u.origin === location.origin && u.pathname.replace(/\/+$/, "") === location.pathname.replace(/\/+$/, ""); } catch (e) { return false; }
 	}
+	/**
+	 * Chrome only EDITORS see: this widget, the element picker's overlays and the WordPress admin bar (with whatever
+	 * plugins put in it). A visitor never sees any of it, so the assistant must not see it either - otherwise it reads
+	 * "Howdy, admin" as page content, measures the admin bar's colours as the design, and builds around a chat panel
+	 * that is not there in real life.
+	 */
+	var CHROME = "[data-livecrafts],#wpadminbar,#wpadminbar *,.lcw-hoverbox,.lcw-pickhint";
+	/** Takes that chrome out of the copy of the page the assistant looks at, so it sees exactly the visitor's view. */
+	function hideChrome(doc) {
+		try {
+			var s = doc.createElement("style");
+			s.setAttribute("data-livecrafts", "hide-chrome");
+			s.textContent = "#wpadminbar,[data-livecrafts],.lcw-hoverbox,.lcw-pickhint{display:none !important}"
+				+ "html{margin-top:0 !important;padding-top:0 !important}body{margin-top:0 !important}";
+			(doc.head || doc.documentElement).appendChild(s);
+			// WordPress sets html{margin-top:32px !important}: only an inline !important beats that.
+			if (doc.documentElement) doc.documentElement.style.setProperty("margin-top", "0", "important");
+		} catch (e) { /* a page we may not touch: the filters below still apply */ }
+	}
+
 	function withDoc(args, fn) {
 		var device = args.device || deviceOf(window.innerWidth);
 		// Always look at a FRESH copy of the page (a hidden frame, cache-busted): the tab the person has open was loaded before the
@@ -391,13 +494,16 @@
 			f.style.cssText = "position:fixed;left:-30000px;top:0;width:" + (DEVW[device] || 1366) + "px;height:900px;border:0;opacity:0;pointer-events:none";
 			var done = false;
 			var fail = function (msg) { if (done) return; done = true; f.remove(); reject(new Error(msg)); };
-			var t = setTimeout(function () { fail("The page took too long to load in the browser."); }, 25000);
+			// A heavy page (a builder home page with lazy images) needs more than 25s on a slow connection; the backend
+			// waits longer than this before it gives up and uses the server's own browser instead.
+			var t = setTimeout(function () { fail("The page took too long to load in this browser."); }, 45000);
 			f.onload = function () {
 				setTimeout(function () {
 					if (done) return;
 					clearTimeout(t);
 					var doc; try { doc = f.contentDocument; } catch (e) { doc = null; }
 					if (!doc) return fail("The page could not be opened in the browser.");
+					hideChrome(doc); // the assistant looks at the visitor's page, never at the editor's chrome
 					Promise.resolve().then(function () { return fn(doc, f.contentWindow, device); })
 						.then(function (r) { done = true; f.remove(); resolve(r); }, function (e) { fail(e && e.message ? e.message : String(e)); });
 				}, 1200); // let fonts and late scripts settle
@@ -408,11 +514,11 @@
 	}
 	function norm(s) { return String(s || "").replace(/\s+/g, " ").trim().toLowerCase(); }
 	function findEls(doc, args) {
-		if (args.selector) { try { return Array.prototype.slice.call(doc.querySelectorAll(args.selector)).filter(function (e) { return !e.closest("[data-livecrafts]"); }); } catch (e) { throw new Error("Invalid CSS selector."); } }
+		if (args.selector) { try { return Array.prototype.slice.call(doc.querySelectorAll(args.selector)).filter(function (e) { return !e.closest(CHROME); }); } catch (e) { throw new Error("Invalid CSS selector."); } }
 		var t = norm(args.text);
 		if (!t) return [];
 		return Array.prototype.filter.call(doc.body.querySelectorAll("*"), function (e) {
-			if (/^(SCRIPT|STYLE|NOSCRIPT)$/.test(e.tagName) || e.closest("[data-livecrafts]")) return false;
+			if (/^(SCRIPT|STYLE|NOSCRIPT)$/.test(e.tagName) || e.closest(CHROME)) return false;
 			return Array.prototype.some.call(e.childNodes, function (n) { return n.nodeType === 3 && norm(n.textContent).indexOf(t) !== -1; });
 		});
 	}
@@ -453,19 +559,19 @@
 	function eyesRead(doc) {
 		return {
 			ok: true, url: doc.location.href.replace(/[?&]lcprobe=\d+/, ""), title: doc.title,
-			headings: Array.prototype.slice.call(doc.querySelectorAll("h1,h2,h3"), 0, 40).map(function (h) { return { tag: h.tagName.toLowerCase(), text: norm(h.textContent).slice(0, 160) }; }),
+			headings: Array.prototype.slice.call(doc.querySelectorAll("h1,h2,h3"), 0, 40).filter(function (h) { return !h.closest(CHROME); }).map(function (h) { return { tag: h.tagName.toLowerCase(), text: norm(h.textContent).slice(0, 160) }; }),
 			text: String(doc.body.innerText || "").replace(/\n{3,}/g, "\n\n").slice(0, 15000),
-			images: Array.prototype.slice.call(doc.images, 0, 30).filter(function (i) { return !i.closest("[data-livecrafts]"); }).map(function (i) { return { src: i.currentSrc || i.src, alt: i.alt, width: i.naturalWidth, height: i.naturalHeight }; }),
-			links: Array.prototype.slice.call(doc.querySelectorAll("a[href]"), 0, 50).filter(function (l) { return !l.closest("[data-livecrafts]"); }).map(function (l) { return { text: norm(l.textContent).slice(0, 60), href: l.href }; }),
+			images: Array.prototype.slice.call(doc.images, 0, 30).filter(function (i) { return !i.closest(CHROME); }).map(function (i) { return { src: i.currentSrc || i.src, alt: i.alt, width: i.naturalWidth, height: i.naturalHeight }; }),
+			links: Array.prototype.slice.call(doc.querySelectorAll("a[href]"), 0, 50).filter(function (l) { return !l.closest(CHROME); }).map(function (l) { return { text: norm(l.textContent).slice(0, 60), href: l.href }; }),
 		};
 	}
 	function eyesDesign(doc, win) {
 		var cs = function (el) { return win.getComputedStyle(el); };
-		var pick = function (sel) { var el = doc.querySelector(sel); if (!el || el.closest("[data-livecrafts]")) return null; var s = cs(el); return { family: s.fontFamily.split(",")[0].replace(/["']/g, "").trim(), size: s.fontSize, weight: s.fontWeight, lineHeight: s.lineHeight, color: s.color, letterSpacing: s.letterSpacing, textTransform: s.textTransform }; };
+		var pick = function (sel) { var el = doc.querySelector(sel); if (!el || el.closest(CHROME)) return null; var s = cs(el); return { family: s.fontFamily.split(",")[0].replace(/["']/g, "").trim(), size: s.fontSize, weight: s.fontWeight, lineHeight: s.lineHeight, color: s.color, letterSpacing: s.letterSpacing, textTransform: s.textTransform }; };
 		var typography = {}; ["h1", "h2", "h3", "h4", "p", "a", "li", "button"].forEach(function (t) { typography[t] = pick(t); });
 		var count = function (m, k) { if (k && !/rgba\(0, 0, 0, 0\)|transparent/.test(k)) m[k] = (m[k] || 0) + 1; };
 		var text = {}, bg = {}, radius = {}, gaps = {};
-		var all = Array.prototype.slice.call(doc.body.querySelectorAll("*"), 0, 3000).filter(function (e) { return !e.closest("[data-livecrafts]"); });
+		var all = Array.prototype.slice.call(doc.body.querySelectorAll("*"), 0, 3000).filter(function (e) { return !e.closest(CHROME); });
 		all.forEach(function (el) {
 			var s = cs(el);
 			if (Array.prototype.some.call(el.childNodes, function (n) { return n.nodeType === 3 && n.textContent.trim(); })) count(text, s.color);
@@ -510,9 +616,11 @@
 			var whole = node === doc.body;
 			var w = whole ? win.innerWidth : Math.ceil(node.getBoundingClientRect().width);
 			var opts = { scale: Math.min(1, 1400 / Math.max(1, w)), quality: 0.82, backgroundColor: "#ffffff",
-				filter: function (n) { return !(n && n.getAttribute && n.getAttribute("data-livecrafts")); } };
+				filter: function (n) { return !(n && n.nodeType === 1 && (n.id === "wpadminbar" || (n.getAttribute && n.getAttribute("data-livecrafts")))); } };
 			// the page: what fits the screen (or the full page); an element: let the library measure it exactly
-			if (whole) { opts.width = w; opts.height = Math.max(1, Math.min(doc.documentElement.scrollHeight, args.fullPage ? 6000 : win.innerHeight)); }
+			// Painting a copy of the whole page is the slow part: 6000px of a builder page could take longer than the
+			// request was allowed to. 3500px is about four screens - enough to judge a section in place.
+			if (whole) { opts.width = w; opts.height = Math.max(1, Math.min(doc.documentElement.scrollHeight, args.fullPage ? 3500 : win.innerHeight)); }
 			else opts.style = { margin: "0" }; // the copy must not pick up default margins (they push the content out of the picture)
 			return lib.domToJpeg(node, opts).then(function (dataUrl) {
 				return { ok: true, image: dataUrl, device: device, target: target, url: doc.location.href.replace(/[?&]lcprobe=\d+/, ""), note: "Captured in the person's own browser." };
