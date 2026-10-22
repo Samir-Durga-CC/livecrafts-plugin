@@ -37,6 +37,8 @@ function livecrafts_rest_ping() {
 			'drafts'      => true,
 			'kinds'       => array_keys( livecrafts_kinds() ),
 			'theme_files' => current_user_can( 'edit_themes' ),
+			'plugin_updates' => current_user_can( 'update_plugins' ),
+			'plugin_update_steps' => true,
 			'theme'       => get_stylesheet(),
 			'block_theme' => function_exists( 'wp_is_block_theme' ) ? wp_is_block_theme() : false,
 		),

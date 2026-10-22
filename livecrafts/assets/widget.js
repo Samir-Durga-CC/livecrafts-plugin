@@ -85,20 +85,40 @@
 			var isLocal = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(backendOrigin);
 			var err = document.createElement("div");
 			err.className = "lcw-offline";
-			err.innerHTML = "<b>Cannot reach the Livecrafts app.</b>" +
-				(isLocal ? "<p>1. Is it running? Start it with <code>npm start</code> (it should say <code>" + escapeHtml(C.backend) + "</code>).</p>" +
-					"<p>2. Did the browser ask to <b>“access other apps and services on this device”</b>? Click <b>Allow</b>. If you closed it: click the icon left of the address bar → Site settings → <b>Local network access</b> → Allow.</p>"
-					: "<p>Check that the Livecrafts app is online at <code>" + escapeHtml(C.backend) + "</code>.</p>") +
-				'<button type="button" class="lcw-retry">Try again</button>';
+			err.setAttribute("role", "alert");
+			err.innerHTML = "<b>Livecrafts is not running</b>" +
+				(isLocal
+					? "<p>The Livecrafts app runs on one computer and this widget only works on that computer.</p>" +
+					  "<ol><li>On that computer, double-click <b>start-livecrafts.bat</b> (in the <code>livecrafts-backend</code> folder) and keep its black window open.</li>" +
+					  "<li>Wait until it says <code>Starting at " + escapeHtml(C.backend) + "</code>.</li>" +
+					  "<li>If the browser asks to <b>“access other apps and services on this device”</b>, click <b>Allow</b>. (Closed it? Click the icon left of the address bar → Site settings → Local network access → Allow.)</li></ol>" +
+					  "<p class=\"lcw-off-note\">This panel reconnects by itself as soon as the app is running.</p>"
+					: "<p>The Livecrafts app at <code>" + escapeHtml(C.backend) + "</code> does not answer. Check that it is online, then try again.</p>") +
+				'<button type="button" class="lcw-retry">Try again now</button>';
 			err.hidden = true;
 			panel.appendChild(err);
 			panel.appendChild(frame);
 			// The chat says "lc:ready" when it loaded; if it never does, the app is not running (or blocked).
-			var ready = false;
-			var watch = function () { setTimeout(function () { if (!ready) err.hidden = false; }, 8000); };
+			// A quick probe shows the message at once when nothing listens, then keeps checking and reconnects by itself.
+			var ready = false, probeTimer = null;
+			var probe = function () {
+				return fetch(backendOrigin + "/health", { mode: "no-cors", cache: "no-store" }).then(function () { return true; }, function () { return false; });
+			};
+			var reconnect = function () {
+				clearInterval(probeTimer);
+				probeTimer = setInterval(function () {
+					if (ready) { clearInterval(probeTimer); return; }
+					probe().then(function (up) { if (up && !ready) { frame.src = frameUrl(); setTimeout(function () { if (ready) err.hidden = true; }, 3000); } });
+				}, 5000);
+			};
+			var showError = function () { if (!ready) { err.hidden = false; reconnect(); } };
+			var watch = function () {
+				probe().then(function (up) { if (!up) setTimeout(showError, 1500); });
+				setTimeout(showError, 9000);
+			};
 			watch();
 			err.querySelector(".lcw-retry").addEventListener("click", function () { err.hidden = true; frame.src = frameUrl(); watch(); });
-			window.addEventListener("message", function (e) { if (e.origin === backendOrigin && e.data && e.data.type === "lc:ready") { ready = true; err.hidden = true; } });
+			window.addEventListener("message", function (e) { if (e.origin === backendOrigin && e.data && e.data.type === "lc:ready") { ready = true; err.hidden = true; clearInterval(probeTimer); } });
 		}
 		panel.hidden = false;
 		root.classList.add("lcw-open");
