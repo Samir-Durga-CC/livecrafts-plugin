@@ -13,8 +13,14 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-/** Believable sample content per template, so a preview shows a finished section instead of empty boxes. */
-function livecrafts_template_sample( $id ) {
+/**
+ * Believable sample content per template, so a preview shows a finished section instead of empty boxes.
+ *
+ * $variant matters for templates whose layouts are built around DIFFERENT things: a hero "signup" is a picture, an
+ * email field and a figure, while "proof" is three reasons and no form. Giving them all one set of content made
+ * every layout preview look the same - which is the one thing a gallery must not do.
+ */
+function livecrafts_template_sample( $id, $variant = '' ) {
 	$lorem   = 'Clear, useful copy that explains the offer in one short sentence.';
 	$person  = array( 'Anita Shah|Founder, Northwind', 'Raj Patel|Operations lead', 'Meera Kapoor|Head of design' );
 	$quote   = array(
@@ -120,6 +126,31 @@ function livecrafts_template_sample( $id ) {
 	);
 
 	$sample = isset( $by_id[ $id ] ) ? $by_id[ $id ] : array();
+
+	// What each hero layout is actually built around. Without this the picture-led ones render as bare text panels.
+	if ( 'hero' === $id ) {
+		$shot = AI_COMPONENTS_URL . 'assets/img/sample.svg';
+		$per  = array(
+			'split'     => array( 'image' => $shot ),
+			'spotlight' => array( 'image' => $shot ),
+			'showcase'  => array( 'image' => $shot, 'secondary_label' => 'Watch the tour' ),
+			'panel'     => array( 'image' => $shot, 'items' => array(
+				array( 'name' => 'Northwind' ), array( 'name' => 'BluePeak' ), array( 'name' => 'Acme Foods' ), array( 'name' => 'Vertex' ),
+			) ),
+			'proof'     => array( 'image' => $shot, 'items' => array(
+				array( 'icon' => 'users', 'title' => 'Over 12,000 teams already use it' ),
+				array( 'icon' => 'check-circle', 'title' => 'No setup fee and no yearly contract' ),
+				array( 'icon' => 'lock', 'title' => 'Every change can be undone' ),
+			) ),
+			'signup'    => array(
+				'image' => $shot, 'action' => '#', 'button_label' => 'Try 14 days free',
+				'placeholder' => 'Enter your email to start', 'proof' => 'Instant access. No card needed.',
+				'stat_value' => '395', 'stat_label' => 'Teams started this month',
+			),
+			'reveal'    => array( 'image' => $shot, 'video_url' => '#', 'video_label' => 'Watch the tour' ),
+		);
+		$sample = array_merge( $sample, isset( $per[ $variant ] ) ? $per[ $variant ] : $per['split'] );
+	}
 	// Anything without its own sample still gets a heading, a lede and three rows, so no preview is ever blank.
 	if ( ! isset( $sample['items'] ) && ! in_array( $id, array( 'button', 'badge', 'alert', 'announcement', 'card', 'empty_state', 'pagination', 'cta', 'newsletter', 'contact_form', 'hero', 'hero_centered' ), true ) ) {
 		$sample['items'] = array(
@@ -163,7 +194,7 @@ add_action( 'rest_api_init', function () {
 					return new WP_Error( 'livecrafts_no_id', 'Pass the template id, e.g. id=testimonials.', array( 'status' => 400 ) );
 				}
 
-				$args = livecrafts_template_sample( $id );
+				$args = livecrafts_template_sample( $id, $variant );
 				if ( $variant ) {
 					$args['variant'] = $variant;
 				}
@@ -210,7 +241,7 @@ add_action( 'template_redirect', function () {
 	}
 
 	$variant = isset( $_GET['lc_tpl_variant'] ) ? sanitize_key( wp_unslash( $_GET['lc_tpl_variant'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-	$args    = livecrafts_template_sample( $id );
+	$args    = livecrafts_template_sample( $id, $variant );
 	if ( $variant ) {
 		$args['variant'] = $variant;
 	}
