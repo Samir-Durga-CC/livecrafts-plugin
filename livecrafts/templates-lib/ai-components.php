@@ -41,7 +41,8 @@ function ai_components_registry() {
 		'breadcrumbs'   => array( 'items' => true, 'defaults' => array() ),
 		'pagination'    => array( 'items' => false, 'defaults' => array( 'current' => 1, 'total' => 1, 'url_pattern' => '?paged=%d' ) ),
 		'empty_state'   => array( 'items' => false, 'defaults' => array( 'icon' => 'search', 'title' => '', 'text' => '', 'label' => '', 'url' => '#' ) ),
-		'hero'          => array( 'items' => true, 'defaults' => array_merge( array( 'variant' => 'split', 'eyebrow' => '', 'heading' => '', 'text' => '', 'image' => '', 'proof' => '' ), $cta ) ),
+		// The signup / reveal layouts take a few extra attributes; the others ignore them.
+		'hero'          => array( 'items' => true, 'defaults' => array_merge( array( 'variant' => 'split', 'eyebrow' => '', 'heading' => '', 'text' => '', 'image' => '', 'proof' => '', 'action' => '', 'field_name' => 'email', 'placeholder' => 'Enter your email', 'button_label' => '', 'stat_value' => '', 'stat_label' => '', 'video_url' => '', 'video_label' => 'Play trailer' ), $cta ) ),
 		'hero_centered' => array( 'items' => true, 'defaults' => array_merge( array( 'eyebrow' => '', 'heading' => '', 'text' => '', 'note' => '' ), $cta ) ),
 		'cta'           => array( 'items' => false, 'defaults' => array_merge( array( 'heading' => '', 'text' => '', 'eyebrow' => '', 'note' => '', 'style' => 'brand' ), $cta ) ),
 		'card'          => array( 'items' => false, 'defaults' => array( 'variant' => 'article', 'title' => '', 'url' => '#', 'image' => '', 'author' => '', 'excerpt' => '', 'date' => '', 'read_time' => '', 'category' => '', 'link_label' => 'Read more' ) ),
