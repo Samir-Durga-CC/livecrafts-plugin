@@ -127,27 +127,50 @@ function livecrafts_template_sample( $id, $variant = '' ) {
 
 	$sample = isset( $by_id[ $id ] ) ? $by_id[ $id ] : array();
 
-	// What each hero layout is actually built around. Without this the picture-led ones render as bare text panels.
+	// What each hero layout is actually built around. Without this the picture-led ones render as bare text
+	// panels and the gallery shows seven tiles that look alike - which is worse than showing none.
 	if ( 'hero' === $id ) {
 		$shot = AI_COMPONENTS_URL . 'assets/img/sample.svg';
 		$per  = array(
-			'split'     => array( 'image' => $shot ),
-			'spotlight' => array( 'image' => $shot ),
-			'showcase'  => array( 'image' => $shot, 'secondary_label' => 'Watch the tour' ),
-			'panel'     => array( 'image' => $shot, 'items' => array(
-				array( 'name' => 'Northwind' ), array( 'name' => 'BluePeak' ), array( 'name' => 'Acme Foods' ), array( 'name' => 'Vertex' ),
-			) ),
-			'proof'     => array( 'image' => $shot, 'items' => array(
-				array( 'icon' => 'users', 'title' => 'Over 12,000 teams already use it' ),
-				array( 'icon' => 'check-circle', 'title' => 'No setup fee and no yearly contract' ),
-				array( 'icon' => 'lock', 'title' => 'Every change can be undone' ),
-			) ),
+			'split'     => array( 'image' => $shot, 'accent' => '' ),
+			'spotlight' => array( 'image' => $shot, 'accent' => '' ),
+			'showcase'  => array(
+				'image' => $shot, 'eyebrow' => 'The platform',
+				'heading' => 'Everything your team ships,', 'accent' => 'in one place.',
+				'secondary_label' => 'Watch the tour',
+			),
+			'panel'     => array(
+				'image' => $shot, 'eyebrow' => 'Why teams move',
+				'heading' => 'Built for the way your team', 'accent' => 'actually works',
+				'items' => array(
+					array( 'name' => 'Northwind' ), array( 'name' => 'BluePeak' ),
+					array( 'name' => 'Acme Foods' ), array( 'name' => 'Vertex' ), array( 'name' => 'Lumen' ),
+				),
+			),
+			'proof'     => array(
+				'image' => '', 'eyebrow' => 'For growing teams',
+				'heading' => 'Ship the change today,', 'accent' => 'not next sprint.',
+				'text' => 'Ask for the change, see it checked, publish it. No ticket, no queue.',
+				'items' => array(
+					array( 'icon' => 'users', 'title' => 'Over 12,000 teams already use it' ),
+					array( 'icon' => 'check-circle', 'title' => 'No setup fee and no yearly contract' ),
+					array( 'icon' => 'lock', 'title' => 'Every change can be undone' ),
+				),
+			),
 			'signup'    => array(
 				'image' => $shot, 'action' => '#', 'button_label' => 'Try 14 days free',
+				'eyebrow' => 'Free for 14 days',
+				'heading' => 'Get it done.', 'accent' => 'Fast, easy.',
+				'text' => 'Everything your site needs, without waiting on a developer to find the time.',
 				'placeholder' => 'Enter your email to start', 'proof' => 'Instant access. No card needed.',
 				'stat_value' => '395', 'stat_label' => 'Teams started this month',
 			),
-			'reveal'    => array( 'image' => $shot, 'video_url' => '#', 'video_label' => 'Watch the tour' ),
+			'reveal'    => array(
+				'image' => $shot, 'video_url' => '#', 'video_label' => 'Watch the tour',
+				'eyebrow' => 'A short film',
+				'heading' => 'The craft behind', 'accent' => 'every page',
+				'text' => 'Eight minutes on how a page goes from a sentence to something you would be proud of.',
+			),
 		);
 		$sample = array_merge( $sample, isset( $per[ $variant ] ) ? $per[ $variant ] : $per['split'] );
 	}

@@ -1,56 +1,82 @@
 <?php
 /**
  * Component: hero
- * Params: variant (split|spotlight|showcase|panel|proof|signup|reveal), eyebrow, heading, text, primary_label,
- *         primary_url, secondary_label, secondary_url, image, proof, action, field_name, placeholder,
- *         button_label, stat_value, stat_label, video_url, video_label, items [ title, text, icon, name ]
+ * Params: variant (split|spotlight|showcase|panel|proof|signup|reveal), eyebrow, heading, accent, text,
+ *         primary_label, primary_url, secondary_label, secondary_url, image, proof, action, field_name,
+ *         placeholder, button_label, stat_value, stat_label, video_url, video_label, items [ title, text, icon, name ]
  * Shortcode: [ai_hero variant="split" eyebrow="New" heading="..." text="..." primary_label="Start" primary_url="/" image="https://..."]
- *   split     - the message on the left, a picture on the right, layered on a soft brand panel (default)
- *   spotlight - centred message on a tinted panel, with the figures that prove it underneath
- *   showcase  - a tall picture beside a centred message on a deep brand panel: for one strong product shot
- *   panel     - message and picture inside one deep card, with an optional strip of customer names under it
- *   proof     - centred message on a deep panel, the reasons to trust it in a row, the picture below
- *   signup    - a full-height picture beside the message and ONE email field: the shortest path to a lead
- *   reveal    - centred message on a deep panel with a wide picture that overlaps its lower edge
+ *   split     - message left, picture right, on the page's own background (default)
+ *   spotlight - centred on a tinted panel, a soft brand glow behind it, the figures underneath
+ *   showcase  - a TALL picture butted against a deep panel, message left-aligned beside it
+ *   panel     - a light bordered card: message left, picture flush to the card's edge, customer names inside
+ *   proof     - the loud one: the full brand colour, the largest type, three reasons, no picture at all
+ *   signup    - full-bleed photograph with a figure on it, message and ONE email field beside it
+ *   reveal    - editorial: a serif line in the heading, then a wide picture straddling a deep band
+ *
+ * WHY THEY LOOK DIFFERENT, AND WHY THAT TOOK A SECOND PASS
+ * The first version of these varied one thing each - where the picture sat - and kept the same panel, the same
+ * eyebrow pill, the same two buttons and the same type size throughout. Rendered without a picture they were
+ * indistinguishable, and even with one they read as the same section seven times. A layout is only a real choice
+ * when it differs on SEVERAL axes at once, so each one here picks its own:
+ *
+ *   variant    background        type                        composition              what carries the proof
+ *   split      surface           4xl-6xl sans                two columns              figures under the text
+ *   spotlight  surface-alt+glow  4xl-6xl sans, centred       one column               figures under a rule
+ *   showcase   brand-900         4xl-6xl sans, left          2/5 tall image + panel   one line of reassurance
+ *   panel      surface-alt       3xl-5xl sans                bordered card, flush img customer names in the card
+ *   proof      brand-600         5xl-7xl sans, centred       one column, no image     three reasons with icons
+ *   signup     surface           4xl-6xl sans, left          full-bleed half photo    a figure on the photograph
+ *   reveal     surface + band    5xl-7xl with a serif line   centred, image straddles the picture itself
+ *
+ * "accent" is a short phrase the heading ends with, set apart: in the brand colour on most layouts, and in italic
+ * serif on "reveal". It is what lets one line of copy carry a bit of character without a second font file.
+ * (It is written inline in each layout: a class attribute built in PHP would be rewritten by the prefixer.)
  *
  * "proof" is one line of reassurance under the buttons (e.g. "Trusted by 150 manufacturers - no card needed").
  * "items" means something different per layout, which is why each one says so:
  *   split / spotlight - the figures  [ title = the number, text = what it counts ]
  *   proof             - the reasons  [ icon, title ]
- *   panel             - the names    [ name ]
+ *   panel             - the names    [ name ]  (an item with no name is skipped, so figures never leak in here)
  *
- * The deep layouts (showcase, panel, proof, reveal) sit on bg-brand-900, a darkened brand colour, so they stay
- * readable whatever brand the site sets - there is no fixed navy anywhere.
+ * Nothing carries a fixed colour: the deep layouts use brand-900 and brand-600, both mixed from the site's own
+ * brand, so none of this is navy on a site that is not.
  */
-$variant   = in_array( $args['variant'] ?? 'split', array( 'split', 'spotlight', 'showcase', 'panel', 'proof', 'signup', 'reveal' ), true ) ? $args['variant'] : 'split';
-$eyebrow   = $args['eyebrow'] ?? '';
-$heading   = $args['heading'] ?? '';
-$text      = $args['text'] ?? '';
-$image     = $args['image'] ?? '';
-$proof     = $args['proof'] ?? '';
-$items     = ai_items( $args );
+$variant = in_array( $args['variant'] ?? 'split', array( 'split', 'spotlight', 'showcase', 'panel', 'proof', 'signup', 'reveal' ), true ) ? $args['variant'] : 'split';
+$eyebrow = $args['eyebrow'] ?? '';
+$heading = $args['heading'] ?? '';
+$accent  = $args['accent'] ?? '';
+$text    = $args['text'] ?? '';
+$image   = $args['image'] ?? '';
+$proof   = $args['proof'] ?? '';
+$items   = ai_items( $args );
 
-$pill  = ai_cls( 'ai:m-0 ai:mb-6 ai:inline-flex ai:items-center ai:gap-2 ai:rounded-full ai:bg-brand-50 ai:px-3 ai:py-1 ai:text-sm ai:font-medium ai:text-brand-700 ai:ring-1 ai:ring-inset ai:ring-brand-200' );
-$lede  = ai_cls( 'ai:mt-6 ai:mb-0 ai:max-w-xl ai:text-lg/8 ai:text-pretty ai:text-muted' );
-$note  = ai_cls( 'ai:mt-6 ai:mb-0 ai:text-sm ai:text-subtle' );
+$pill = ai_cls( 'ai:m-0 ai:mb-6 ai:inline-flex ai:items-center ai:gap-2 ai:rounded-full ai:bg-brand-50 ai:px-3 ai:py-1 ai:text-sm ai:font-medium ai:text-brand-700 ai:ring-1 ai:ring-inset ai:ring-brand-200' );
+$lede = ai_cls( 'ai:mt-6 ai:mb-0 ai:max-w-xl ai:text-lg/8 ai:text-pretty ai:text-muted' );
+$note = ai_cls( 'ai:mt-6 ai:mb-0 ai:text-sm ai:text-subtle' );
 
-/* On a deep panel the type is light: these are the same three roles, inverted. */
+/* The same three roles inverted, for the layouts that sit on a deep panel. */
 $d_eyebrow = ai_cls( 'ai:m-0 ai:mb-4 ai:text-sm ai:font-semibold ai:tracking-widest ai:uppercase ai:text-brand-200' );
-$d_heading = ai_cls( 'ai:m-0 ai:text-4xl ai:font-bold ai:tracking-tight ai:text-balance ai:text-white ai:sm:text-5xl' );
 $d_lede    = ai_cls( 'ai:mt-5 ai:mb-0 ai:text-lg/8 ai:text-pretty ai:text-white/70' );
 $d_note    = ai_cls( 'ai:mt-6 ai:mb-0 ai:text-sm ai:text-white/60' );
 
-/**
- * The buttons, in every layout. Guarded: load_template() includes this file again for a second hero on the same
- * page, and an unguarded function would be declared twice and stop the page.
- */
 if ( ! function_exists( 'ai_hero_buttons' ) ) {
-	/** $tone "ink" on a pale background, "light" on a deep one (the outline button would vanish otherwise). */
-	function ai_hero_buttons( $args, $tone = 'ink' ) {
+	/**
+	 * The buttons. Guarded: load_template() includes this file again for a second hero on the same page, and an
+	 * unguarded function would be declared twice and stop the page.
+	 *
+	 * $tone "ink" on a pale background, "light" on a deep one (an outline button would vanish there). $only keeps
+	 * the primary: the loud layouts say one thing, and a second button next to it halves the first one's weight.
+	 */
+	function ai_hero_buttons( $args, $tone = 'ink', $only = false ) {
 		if ( ! empty( $args['primary_label'] ) ) {
-			ai_component( 'button', array( 'label' => $args['primary_label'], 'url' => $args['primary_url'] ?? '#', 'size' => 'lg' ) );
+			ai_component( 'button', array(
+				'label'   => $args['primary_label'],
+				'url'     => $args['primary_url'] ?? '#',
+				'size'    => 'lg',
+				'variant' => 'light' === $tone ? 'light' : 'solid',
+			) );
 		}
-		if ( ! empty( $args['secondary_label'] ) ) {
+		if ( ! $only && ! empty( $args['secondary_label'] ) ) {
 			ai_component( 'button', array(
 				'label'   => $args['secondary_label'],
 				'url'     => $args['secondary_url'] ?? '#',
@@ -62,14 +88,16 @@ if ( ! function_exists( 'ai_hero_buttons' ) ) {
 	}
 }
 
-if ( ! function_exists( 'ai_hero_glow' ) ) {
-	/**
-	 * A soft brand glow behind the message: depth with no image to download.
-	 * One constant string, never concatenated - the build prefixes the class attribute where it finds it, and a
-	 * joined one would hand it the surrounding PHP as class names.
-	 */
-	function ai_hero_glow() {
-		echo '<div class="ai:pointer-events-none ai:absolute ai:-top-24 ai:left-1/2 ai:size-[36rem] ai:-translate-x-1/2 ai:rounded-full ai:bg-brand-500 ai:opacity-20 ai:blur-3xl" aria-hidden="true"></div>';
+if ( ! function_exists( 'ai_hero_named' ) ) {
+	/** Only the items that actually name somebody, so a set of figures never renders as a row of logos. */
+	function ai_hero_named( $items ) {
+		$out = array();
+		foreach ( (array) $items as $i ) {
+			if ( ! empty( $i['name'] ) ) {
+				$out[] = $i['name'];
+			}
+		}
+		return $out;
 	}
 }
 ?>
@@ -79,7 +107,7 @@ if ( ! function_exists( 'ai_hero_glow' ) ) {
   <div class="ai:pointer-events-none ai:absolute ai:-top-40 ai:left-1/2 ai:size-[42rem] ai:-translate-x-1/2 ai:rounded-full ai:bg-brand-100 ai:opacity-60 ai:blur-3xl" aria-hidden="true"></div>
   <div class="ai:relative ai:mx-auto ai:max-w-wide ai:px-4 ai:text-center ai:sm:px-6 ai:lg:px-8">
     <?php if ( $eyebrow ) : ?><p class="<?php echo esc_attr( $pill ); ?>"><?php echo esc_html( $eyebrow ); ?></p><?php endif; ?>
-    <h1 class="ai:mx-auto ai:m-0 ai:max-w-4xl ai:text-4xl ai:font-bold ai:tracking-tight ai:text-balance ai:text-ink ai:sm:text-5xl ai:lg:text-6xl"><?php echo esc_html( $heading ); ?></h1>
+    <h1 class="ai:mx-auto ai:m-0 ai:max-w-4xl ai:text-4xl ai:font-bold ai:tracking-tight ai:text-balance ai:text-ink ai:sm:text-5xl ai:lg:text-6xl"><?php echo esc_html( $heading ); ?><?php if ( $accent ) : ?> <span class="ai:text-brand-600"><?php echo esc_html( $accent ); ?></span><?php endif; ?></h1>
     <?php if ( $text ) : ?>
     <p class="ai:mx-auto ai:mt-6 ai:mb-0 ai:max-w-2xl ai:text-lg/8 ai:text-pretty ai:text-muted"><?php echo esc_html( $text ); ?></p>
     <?php endif; ?>
@@ -107,24 +135,30 @@ if ( ! function_exists( 'ai_hero_glow' ) ) {
 
 <?php elseif ( 'showcase' === $variant ) : ?>
 <?php
-/* A class attribute is either wholly static or wholly PHP: the build prefixes the literal, so the two may not mix. */
-$sc_card = ai_cls( 'ai:relative ai:flex ai:flex-col ai:items-center ai:justify-center ai:overflow-hidden ai:rounded-band ai:p-8 ai:text-center ai:ring-1 ai:ring-inset ai:ring-white/10 ai:sm:p-14' )
-	. ' ' . ( $image ? ai_cls( 'ai:lg:col-span-2' ) : ai_cls( 'ai:lg:col-span-3' ) );
+/* The picture is TALL and butted against the panel, which is what makes this one recognisable at a glance: no
+   other layout is two unequal columns of full height. Without a picture the panel simply takes the whole width. */
+$sc_panel = ai_cls( 'ai:relative ai:flex ai:flex-col ai:justify-center ai:overflow-hidden ai:rounded-band ai:p-8 ai:ring-1 ai:ring-inset ai:ring-white/10 ai:sm:p-14' )
+	. ' ' . ( $image ? ai_cls( 'ai:lg:col-span-3' ) : ai_cls( 'ai:lg:col-span-5' ) );
 ?>
-<!-- A tall product shot holds one third; the message sits centred in the panel beside it. -->
 <section class="ai-c ai:bg-brand-900 ai:py-sec-sm ai:sm:py-sec">
   <div class="ai:mx-auto ai:max-w-wide ai:px-4 ai:sm:px-6 ai:lg:px-8">
-    <div class="ai:grid ai:gap-6 ai:lg:grid-cols-3">
+    <div class="ai:grid ai:gap-5 ai:lg:grid-cols-5">
       <?php if ( $image ) : ?>
-      <img alt="" src="<?php echo esc_url( $image ); ?>" class="ai:block ai:h-80 ai:w-full ai:max-w-full ai:rounded-band ai:object-cover ai:lg:h-auto ai:lg:self-stretch" />
+      <div class="ai:relative ai:min-h-80 ai:overflow-hidden ai:rounded-band ai:lg:col-span-2">
+        <img alt="" src="<?php echo esc_url( $image ); ?>" class="ai:absolute ai:inset-0 ai:block ai:size-full ai:object-cover" />
+      </div>
       <?php endif; ?>
-      <div class="<?php echo esc_attr( $sc_card ); ?>">
-        <?php ai_hero_glow(); ?>
-        <div class="ai:relative ai:max-w-2xl">
-          <?php if ( $eyebrow ) : ?><p class="<?php echo esc_attr( $d_eyebrow ); ?>"><?php echo esc_html( $eyebrow ); ?></p><?php endif; ?>
-          <h1 class="<?php echo esc_attr( $d_heading ); ?>"><?php echo esc_html( $heading ); ?></h1>
+      <div class="<?php echo esc_attr( $sc_panel ); ?>">
+        <div class="ai:pointer-events-none ai:absolute ai:-top-24 ai:-right-24 ai:size-[28rem] ai:rounded-full ai:bg-brand-500 ai:opacity-25 ai:blur-3xl" aria-hidden="true"></div>
+        <div class="ai:relative ai:max-w-xl">
+          <?php if ( $eyebrow ) : ?>
+          <p class="ai:m-0 ai:mb-5 ai:flex ai:items-center ai:gap-3 ai:text-xs ai:font-semibold ai:tracking-widest ai:uppercase ai:text-brand-200">
+            <span class="ai:h-px ai:w-8 ai:bg-brand-200/60"></span><?php echo esc_html( $eyebrow ); ?>
+          </p>
+          <?php endif; ?>
+          <h1 class="ai:m-0 ai:text-4xl ai:font-bold ai:tracking-tight ai:text-balance ai:text-white ai:sm:text-5xl ai:lg:text-6xl"><?php echo esc_html( $heading ); ?><?php if ( $accent ) : ?> <span class="ai:text-brand-300"><?php echo esc_html( $accent ); ?></span><?php endif; ?></h1>
           <?php if ( $text ) : ?><p class="<?php echo esc_attr( $d_lede ); ?>"><?php echo esc_html( $text ); ?></p><?php endif; ?>
-          <div class="ai:mt-8 ai:flex ai:flex-wrap ai:items-center ai:justify-center ai:gap-3"><?php ai_hero_buttons( $args, 'light' ); ?></div>
+          <div class="ai:mt-8 ai:flex ai:flex-wrap ai:items-center ai:gap-3"><?php ai_hero_buttons( $args, 'light' ); ?></div>
           <?php if ( $proof ) : ?><p class="<?php echo esc_attr( $d_note ); ?>"><?php echo esc_html( $proof ); ?></p><?php endif; ?>
         </div>
       </div>
@@ -133,66 +167,63 @@ $sc_card = ai_cls( 'ai:relative ai:flex ai:flex-col ai:items-center ai:justify-c
 </section>
 
 <?php elseif ( 'panel' === $variant ) : ?>
-<!-- Message and picture share one card, so the hero reads as a single object on the page. -->
-<section class="ai-c ai:bg-brand-900 ai:py-sec-sm ai:sm:py-sec">
+<?php $names = ai_hero_named( $items ); ?>
+<!-- Light, and the only layout that is one bordered card with the picture flush to its edge. -->
+<section class="ai-c ai:bg-surface-alt ai:py-sec-sm ai:sm:py-sec">
   <div class="ai:mx-auto ai:max-w-wide ai:px-4 ai:sm:px-6 ai:lg:px-8">
-    <div class="ai:relative ai:overflow-hidden ai:rounded-band ai:p-8 ai:ring-1 ai:ring-inset ai:ring-white/10 ai:sm:p-12">
-      <?php ai_hero_glow(); ?>
-      <div class="ai:relative ai:grid ai:items-center ai:gap-10 ai:lg:grid-cols-2 ai:lg:gap-16">
-        <div>
-          <?php if ( $eyebrow ) : ?><p class="<?php echo esc_attr( $d_eyebrow ); ?>"><?php echo esc_html( $eyebrow ); ?></p><?php endif; ?>
-          <h1 class="<?php echo esc_attr( $d_heading ); ?>"><?php echo esc_html( $heading ); ?></h1>
-          <?php if ( $text ) : ?><p class="<?php echo esc_attr( $d_lede ); ?>"><?php echo esc_html( $text ); ?></p><?php endif; ?>
-          <div class="ai:mt-8 ai:flex ai:flex-wrap ai:items-center ai:gap-3"><?php ai_hero_buttons( $args, 'light' ); ?></div>
-          <?php if ( $proof ) : ?><p class="<?php echo esc_attr( $d_note ); ?>"><?php echo esc_html( $proof ); ?></p><?php endif; ?>
+    <div class="ai:overflow-hidden ai:rounded-band ai:bg-surface ai:shadow-sm ai:ring-1 ai:ring-line">
+      <div class="ai:grid ai:lg:grid-cols-2">
+        <div class="ai:order-2 ai:flex ai:flex-col ai:justify-center ai:p-8 ai:sm:p-12 ai:lg:order-1">
+          <?php if ( $eyebrow ) : ?><p class="ai:m-0 ai:mb-4 ai:text-xs ai:font-semibold ai:tracking-widest ai:uppercase ai:text-brand-700"><?php echo esc_html( $eyebrow ); ?></p><?php endif; ?>
+          <h1 class="ai:m-0 ai:text-3xl ai:font-bold ai:tracking-tight ai:text-balance ai:text-ink ai:sm:text-4xl ai:lg:text-5xl"><?php echo esc_html( $heading ); ?><?php if ( $accent ) : ?> <span class="ai:text-brand-600"><?php echo esc_html( $accent ); ?></span><?php endif; ?></h1>
+          <?php if ( $text ) : ?><p class="ai:mt-5 ai:mb-0 ai:text-base/7 ai:text-pretty ai:text-muted"><?php echo esc_html( $text ); ?></p><?php endif; ?>
+          <div class="ai:mt-7 ai:flex ai:flex-wrap ai:items-center ai:gap-3"><?php ai_hero_buttons( $args ); ?></div>
+          <?php if ( $proof ) : ?><p class="ai:mt-5 ai:mb-0 ai:text-sm ai:text-subtle"><?php echo esc_html( $proof ); ?></p><?php endif; ?>
+
+          <?php if ( $names ) : ?>
+          <!-- the names live INSIDE the card, under a rule: proof that belongs to the offer, not a separate band -->
+          <div class="ai:mt-8 ai:border-t ai:border-line ai:pt-6">
+            <ul class="ai:m-0 ai:flex ai:flex-wrap ai:items-center ai:gap-x-7 ai:gap-y-3">
+              <?php foreach ( $names as $n ) : ?>
+              <li class="ai:m-0 ai:text-sm ai:font-semibold ai:tracking-tight ai:text-subtle"><?php echo esc_html( $n ); ?></li>
+              <?php endforeach; ?>
+            </ul>
+          </div>
+          <?php endif; ?>
         </div>
         <?php if ( $image ) : ?>
-        <div class="ai:overflow-hidden ai:rounded-card ai:bg-white">
-          <img alt="" src="<?php echo esc_url( $image ); ?>" class="ai:block ai:h-auto ai:w-full ai:max-w-full ai:object-cover" />
+        <div class="ai:relative ai:order-1 ai:min-h-72 ai:lg:order-2 ai:lg:min-h-[28rem]">
+          <img alt="" src="<?php echo esc_url( $image ); ?>" class="ai:absolute ai:inset-0 ai:block ai:size-full ai:object-cover" />
         </div>
         <?php endif; ?>
       </div>
     </div>
-
-    <?php if ( $items ) : ?>
-    <!-- The names under the card: who already trusts this. Text, so no logo files have to be found. -->
-    <ul class="ai:m-0 ai:mt-6 ai:flex ai:flex-wrap ai:items-center ai:justify-center ai:gap-x-12 ai:gap-y-4 ai:rounded-band ai:px-8 ai:py-8 ai:ring-1 ai:ring-inset ai:ring-white/10">
-      <?php foreach ( $items as $item ) : ?>
-      <li class="ai:m-0 ai:text-lg ai:font-semibold ai:tracking-tight ai:text-white/50"><?php echo esc_html( $item['name'] ?? $item['title'] ?? '' ); ?></li>
-      <?php endforeach; ?>
-    </ul>
-    <?php endif; ?>
   </div>
 </section>
 
 <?php elseif ( 'proof' === $variant ) : ?>
-<!-- Centred message, then the three reasons to believe it, then the picture. -->
-<section class="ai-c ai:relative ai:overflow-hidden ai:bg-brand-900 ai:py-sec-sm ai:sm:py-sec">
-  <?php ai_hero_glow(); ?>
+<!-- The loud one: the full brand colour, the largest type on the site, one button, and no picture anywhere.
+     Being the only layout with nothing to look at is exactly what makes it read differently. -->
+<section class="ai-c ai:relative ai:overflow-hidden ai:bg-brand-600 ai:py-sec-sm ai:sm:py-sec">
+  <div class="ai:pointer-events-none ai:absolute ai:-top-32 ai:left-1/2 ai:size-[44rem] ai:-translate-x-1/2 ai:rounded-full ai:bg-white ai:opacity-10 ai:blur-3xl" aria-hidden="true"></div>
   <div class="ai:relative ai:mx-auto ai:max-w-wide ai:px-4 ai:text-center ai:sm:px-6 ai:lg:px-8">
-    <?php if ( $eyebrow ) : ?><p class="<?php echo esc_attr( $d_eyebrow ); ?>"><?php echo esc_html( $eyebrow ); ?></p><?php endif; ?>
-    <h1 class="ai:mx-auto ai:m-0 ai:max-w-3xl ai:text-4xl ai:font-bold ai:tracking-tight ai:text-balance ai:text-white ai:sm:text-6xl"><?php echo esc_html( $heading ); ?></h1>
+    <?php if ( $eyebrow ) : ?><p class="ai:m-0 ai:mb-6 ai:text-xs ai:font-semibold ai:tracking-widest ai:uppercase ai:text-white/70"><?php echo esc_html( $eyebrow ); ?></p><?php endif; ?>
+    <h1 class="ai:mx-auto ai:m-0 ai:max-w-4xl ai:text-5xl ai:font-bold ai:tracking-tighter ai:text-balance ai:text-white ai:sm:text-6xl ai:lg:text-7xl"><?php echo esc_html( $heading ); ?><?php if ( $accent ) : ?> <span class="ai:text-white/60"><?php echo esc_html( $accent ); ?></span><?php endif; ?></h1>
     <?php if ( $text ) : ?>
-    <p class="ai:mx-auto ai:mt-5 ai:mb-0 ai:max-w-2xl ai:text-lg/8 ai:text-pretty ai:text-white/70"><?php echo esc_html( $text ); ?></p>
+    <p class="ai:mx-auto ai:mt-6 ai:mb-0 ai:max-w-xl ai:text-lg/8 ai:text-pretty ai:text-white/80"><?php echo esc_html( $text ); ?></p>
     <?php endif; ?>
-    <div class="ai:mt-10 ai:flex ai:flex-wrap ai:items-center ai:justify-center ai:gap-3"><?php ai_hero_buttons( $args, 'light' ); ?></div>
-    <?php if ( $proof ) : ?><p class="<?php echo esc_attr( $d_note ); ?>"><?php echo esc_html( $proof ); ?></p><?php endif; ?>
+    <div class="ai:mt-10 ai:flex ai:flex-wrap ai:items-center ai:justify-center ai:gap-3"><?php ai_hero_buttons( $args, 'light', true ); ?></div>
+    <?php if ( $proof ) : ?><p class="ai:mt-6 ai:mb-0 ai:text-sm ai:text-white/70"><?php echo esc_html( $proof ); ?></p><?php endif; ?>
 
     <?php if ( $items ) : ?>
-    <ul class="ai:m-0 ai:mx-auto ai:mt-14 ai:grid ai:max-w-4xl ai:gap-8 ai:text-left ai:sm:grid-cols-3">
+    <ul class="ai:m-0 ai:mx-auto ai:mt-16 ai:grid ai:max-w-4xl ai:gap-x-10 ai:gap-y-6 ai:border-t ai:border-white/20 ai:pt-10 ai:text-left ai:sm:grid-cols-3">
       <?php foreach ( array_slice( $items, 0, 3 ) as $item ) : ?>
       <li class="ai:m-0 ai:flex ai:items-start ai:gap-3">
-        <span class="ai:mt-0.5 ai:text-brand-200"><?php ai_e_icon( $item['icon'] ?? 'check-circle', 5 ); ?></span>
-        <span class="ai:text-sm/6 ai:text-white/80"><?php echo esc_html( $item['title'] ?? $item['text'] ?? '' ); ?></span>
+        <span class="ai:mt-0.5 ai:text-white"><?php ai_e_icon( $item['icon'] ?? 'check-circle', 5 ); ?></span>
+        <span class="ai:text-sm/6 ai:font-medium ai:text-white/90"><?php echo esc_html( $item['title'] ?? $item['text'] ?? '' ); ?></span>
       </li>
       <?php endforeach; ?>
     </ul>
-    <?php endif; ?>
-
-    <?php if ( $image ) : ?>
-    <div class="ai:relative ai:mx-auto ai:mt-16 ai:max-w-5xl">
-      <img alt="" src="<?php echo esc_url( $image ); ?>" class="ai:block ai:h-auto ai:w-full ai:max-w-full ai:rounded-band ai:object-cover ai:shadow-2xl ai:ring-1 ai:ring-white/10" />
-    </div>
     <?php endif; ?>
   </div>
 </section>
@@ -205,20 +236,20 @@ $placeholder = $args['placeholder'] ?? 'Enter your email';
 $btn_label   = $args['button_label'] ?? ( $args['primary_label'] ?? 'Get started' );
 $stat_value  = $args['stat_value'] ?? '';
 $stat_label  = $args['stat_label'] ?? '';
-$su_col      = ai_cls( 'ai:order-1 ai:flex ai:w-full ai:items-center ai:justify-center ai:px-4 ai:py-sec-sm ai:sm:px-6 ai:lg:order-2 ai:lg:px-12' )
-	. ' ' . ( $image ? ai_cls( 'ai:lg:w-7/12' ) : ai_cls( 'ai:lg:w-full' ) );
+/* No max-width wrapper on purpose: the photograph runs to the edge of the screen, which no other layout does. */
+$su_col      = ai_cls( 'ai:order-1 ai:flex ai:items-center ai:px-4 ai:py-sec-sm ai:sm:px-8 ai:lg:order-2 ai:lg:px-16' )
+	. ' ' . ( $image ? '' : ai_cls( 'ai:justify-center ai:text-center' ) );
 ?>
-<!-- Picture and message side by side, full height, with one field: the shortest path from reading to signing up. -->
-<section class="ai-c ai:bg-surface-alt">
-  <div class="ai:flex ai:flex-col ai:lg:min-h-[36rem] ai:lg:flex-row ai:lg:items-stretch">
+<section class="ai-c ai:bg-surface">
+  <div class="ai:grid ai:lg:min-h-[34rem] ai:lg:grid-cols-2">
     <?php if ( $image ) : ?>
-    <div class="ai:relative ai:order-2 ai:h-80 ai:w-full ai:overflow-hidden ai:lg:order-1 ai:lg:h-auto ai:lg:w-5/12">
+    <div class="ai:relative ai:order-2 ai:h-72 ai:overflow-hidden ai:sm:h-96 ai:lg:order-1 ai:lg:h-auto">
       <img alt="" src="<?php echo esc_url( $image ); ?>" class="ai:absolute ai:inset-0 ai:block ai:size-full ai:object-cover" />
       <?php if ( $stat_value ) : ?>
-      <!-- the figure sits on the picture, over a gradient so it stays readable on any photograph -->
-      <div class="ai:absolute ai:inset-x-0 ai:bottom-0 ai:bg-gradient-to-t ai:from-black/80 ai:to-transparent ai:p-6 ai:sm:p-8">
-        <p class="ai:m-0 ai:text-5xl ai:font-bold ai:tracking-tight ai:text-white"><?php echo esc_html( $stat_value ); ?></p>
-        <?php if ( $stat_label ) : ?><p class="ai:m-0 ai:mt-1 ai:max-w-xs ai:text-sm ai:text-white/80"><?php echo esc_html( $stat_label ); ?></p><?php endif; ?>
+      <!-- the figure sits ON the photograph, over a gradient so it stays readable whatever the picture is -->
+      <div class="ai:absolute ai:inset-x-0 ai:bottom-0 ai:bg-gradient-to-t ai:from-black/80 ai:via-black/40 ai:to-transparent ai:p-6 ai:sm:p-10">
+        <p class="ai:m-0 ai:text-5xl ai:font-bold ai:tracking-tight ai:text-white ai:sm:text-6xl"><?php echo esc_html( $stat_value ); ?></p>
+        <?php if ( $stat_label ) : ?><p class="ai:m-0 ai:mt-2 ai:max-w-xs ai:text-sm/6 ai:text-white/85"><?php echo esc_html( $stat_label ); ?></p><?php endif; ?>
       </div>
       <?php endif; ?>
     </div>
@@ -227,16 +258,16 @@ $su_col      = ai_cls( 'ai:order-1 ai:flex ai:w-full ai:items-center ai:justify-
     <div class="<?php echo esc_attr( $su_col ); ?>">
       <div class="ai:w-full ai:max-w-xl">
         <?php if ( $eyebrow ) : ?><p class="<?php echo esc_attr( $pill ); ?>"><?php echo esc_html( $eyebrow ); ?></p><?php endif; ?>
-        <h1 class="ai:m-0 ai:text-4xl ai:font-bold ai:tracking-tight ai:text-balance ai:text-ink ai:sm:text-5xl ai:lg:text-6xl"><?php echo esc_html( $heading ); ?></h1>
-        <?php if ( $text ) : ?><p class="<?php echo esc_attr( $lede ); ?>"><?php echo esc_html( $text ); ?></p><?php endif; ?>
+        <h1 class="ai:m-0 ai:text-4xl ai:font-bold ai:tracking-tight ai:text-balance ai:text-ink ai:sm:text-5xl ai:lg:text-6xl"><?php echo esc_html( $heading ); ?><?php if ( $accent ) : ?> <span class="ai:text-brand-600"><?php echo esc_html( $accent ); ?></span><?php endif; ?></h1>
+        <?php if ( $text ) : ?><p class="ai:mt-5 ai:mb-0 ai:text-lg/8 ai:text-pretty ai:text-muted"><?php echo esc_html( $text ); ?></p><?php endif; ?>
 
         <?php if ( $action ) : ?>
         <form action="<?php echo esc_url( $action ); ?>" method="post" class="ai:mt-8">
           <div class="ai:flex ai:flex-col ai:gap-3 ai:sm:flex-row">
             <label for="ai-hero-signup" class="ai:sr-only"><?php echo esc_html( $placeholder ); ?></label>
             <input id="ai-hero-signup" type="email" required name="<?php echo esc_attr( $field_name ); ?>" placeholder="<?php echo esc_attr( $placeholder ); ?>"
-              class="ai:w-full ai:min-w-0 ai:flex-1 ai:rounded-lg ai:bg-surface ai:px-4 ai:py-3 ai:text-base ai:text-ink ai:ring-1 ai:ring-inset ai:ring-line ai:focus:outline-2 ai:focus:outline-offset-2 ai:focus:outline-brand-600" />
-            <button type="submit" class="ai:inline-flex ai:items-center ai:justify-center ai:rounded-lg ai:bg-brand-600 ai:px-6 ai:py-3 ai:text-base ai:font-semibold ai:text-white ai:transition-colors ai:hover:bg-brand-700 ai:focus-visible:outline-2 ai:focus-visible:outline-offset-2 ai:focus-visible:outline-brand-600">
+              class="ai:w-full ai:min-w-0 ai:flex-1 ai:rounded-ctl ai:bg-surface ai:px-4 ai:py-3.5 ai:text-base ai:text-ink ai:ring-1 ai:ring-inset ai:ring-line ai:focus:outline-2 ai:focus:outline-offset-2 ai:focus:outline-brand-600" />
+            <button type="submit" class="ai:inline-flex ai:items-center ai:justify-center ai:rounded-ctl ai:bg-brand-600 ai:px-6 ai:py-3.5 ai:text-base ai:font-semibold ai:whitespace-nowrap ai:text-white ai:transition-colors ai:hover:bg-brand-700 ai:focus-visible:outline-2 ai:focus-visible:outline-offset-2 ai:focus-visible:outline-brand-600">
               <?php echo esc_html( $btn_label ); ?>
             </button>
           </div>
@@ -245,7 +276,7 @@ $su_col      = ai_cls( 'ai:order-1 ai:flex ai:w-full ai:items-center ai:justify-
         <div class="ai:mt-8 ai:flex ai:flex-wrap ai:items-center ai:gap-3"><?php ai_hero_buttons( $args ); ?></div>
         <?php endif; ?>
 
-        <?php if ( $proof ) : ?><p class="<?php echo esc_attr( $note ); ?>"><?php echo esc_html( $proof ); ?></p><?php endif; ?>
+        <?php if ( $proof ) : ?><p class="ai:mt-5 ai:mb-0 ai:text-sm ai:text-subtle"><?php echo esc_html( $proof ); ?></p><?php endif; ?>
       </div>
     </div>
   </div>
@@ -255,43 +286,43 @@ $su_col      = ai_cls( 'ai:order-1 ai:flex ai:w-full ai:items-center ai:justify-
 <?php
 $video_url   = $args['video_url'] ?? '';
 $video_label = $args['video_label'] ?? 'Play trailer';
-/* With a picture the panel keeps room at the bottom for it to sit over; without one it closes up normally. */
-$rv_panel    = ai_cls( 'ai:relative ai:overflow-hidden ai:rounded-band ai:bg-brand-900 ai:px-6 ai:pt-sec-sm ai:text-center ai:sm:px-12 ai:sm:pt-sec' )
-	. ' ' . ( $image ? ai_cls( 'ai:pb-40 ai:sm:pb-56' ) : ai_cls( 'ai:pb-sec-sm ai:sm:pb-sec' ) );
 ?>
-<!-- The picture overlaps the panel's lower edge. The overlap is INSIDE this section, so the sections around it
-     keep their own spacing and nothing is clipped by a theme that sets overflow on the content wrapper. -->
-<section class="ai-c ai:bg-surface ai:pb-sec-sm ai:sm:pb-sec">
-  <div class="ai:mx-auto ai:max-w-wide ai:px-4 ai:sm:px-6 ai:lg:px-8">
-    <div class="<?php echo esc_attr( $rv_panel ); ?>">
-      <?php ai_hero_glow(); ?>
-      <div class="ai:relative ai:mx-auto ai:max-w-2xl">
-        <?php if ( $eyebrow ) : ?><p class="<?php echo esc_attr( $d_eyebrow ); ?>"><?php echo esc_html( $eyebrow ); ?></p><?php endif; ?>
-        <h1 class="ai:m-0 ai:text-5xl ai:font-bold ai:tracking-tight ai:text-balance ai:text-white ai:sm:text-7xl"><?php echo esc_html( $heading ); ?></h1>
-        <?php if ( $text ) : ?><p class="<?php echo esc_attr( $d_lede ); ?>"><?php echo esc_html( $text ); ?></p><?php endif; ?>
-        <div class="ai:mt-8 ai:flex ai:flex-wrap ai:items-center ai:justify-center ai:gap-3"><?php ai_hero_buttons( $args, 'light' ); ?></div>
-        <?php if ( $proof ) : ?><p class="<?php echo esc_attr( $d_note ); ?>"><?php echo esc_html( $proof ); ?></p><?php endif; ?>
-      </div>
-    </div>
+<!-- Editorial: the heading's accent is set in italic serif, which nothing else here does, and the picture
+     straddles the join between the light half and the deep band. The band is drawn INSIDE this section, so the
+     sections around it keep their own spacing and no theme's overflow rule can clip it. -->
+<section class="ai-c ai:bg-surface ai:pt-sec-sm ai:sm:pt-sec">
+  <div class="ai:mx-auto ai:max-w-wide ai:px-4 ai:text-center ai:sm:px-6 ai:lg:px-8">
+    <?php if ( $eyebrow ) : ?><p class="ai:m-0 ai:mb-5 ai:text-xs ai:font-semibold ai:tracking-widest ai:uppercase ai:text-muted"><?php echo esc_html( $eyebrow ); ?></p><?php endif; ?>
+    <h1 class="ai:mx-auto ai:m-0 ai:max-w-3xl ai:text-5xl ai:leading-tight ai:font-bold ai:tracking-tighter ai:text-balance ai:text-ink ai:sm:text-6xl ai:lg:text-7xl"><?php echo esc_html( $heading ); ?><?php if ( $accent ) : ?> <span class="ai:font-serif ai:font-normal ai:italic"><?php echo esc_html( $accent ); ?></span><?php endif; ?></h1>
+    <?php if ( $text ) : ?>
+    <p class="ai:mx-auto ai:mt-6 ai:mb-0 ai:max-w-xl ai:text-base/7 ai:text-pretty ai:text-muted"><?php echo esc_html( $text ); ?></p>
+    <?php endif; ?>
+    <div class="ai:mt-9 ai:flex ai:flex-wrap ai:items-center ai:justify-center ai:gap-3"><?php ai_hero_buttons( $args, 'ink', true ); ?></div>
+    <?php if ( $proof ) : ?><p class="<?php echo esc_attr( $note ); ?>"><?php echo esc_html( $proof ); ?></p><?php endif; ?>
+  </div>
 
-    <?php if ( $image ) : ?>
-    <!-- pulled up over the panel it just left: one object straddling two bands -->
-    <div class="ai:relative ai:z-10 ai:mx-auto ai:-mt-32 ai:max-w-4xl ai:sm:-mt-44">
+  <?php if ( $image ) : ?>
+  <div class="ai:relative ai:mt-14">
+    <!-- the deep band takes the lower half, so the picture sits across the join -->
+    <div class="ai:absolute ai:inset-x-0 ai:bottom-0 ai:h-1/2 ai:bg-brand-900" aria-hidden="true"></div>
+    <div class="ai:relative ai:mx-auto ai:max-w-5xl ai:px-4 ai:sm:px-6 ai:lg:px-8">
       <div class="ai:relative ai:overflow-hidden ai:rounded-band ai:shadow-2xl ai:ring-1 ai:ring-ink/10">
         <img alt="" src="<?php echo esc_url( $image ); ?>" class="ai:block ai:aspect-16/9 ai:h-auto ai:w-full ai:max-w-full ai:object-cover" />
         <?php if ( $video_url ) : ?>
         <!-- a link, not a player: no JavaScript ships to the site -->
-        <a href="<?php echo esc_url( $video_url ); ?>" class="ai:absolute ai:inset-0 ai:flex ai:flex-col ai:items-center ai:justify-center ai:gap-3 ai:bg-black/30 ai:no-underline ai:transition-colors ai:hover:bg-black/40">
-          <span class="ai:flex ai:size-16 ai:items-center ai:justify-center ai:rounded-full ai:ring-2 ai:ring-inset ai:ring-white/70">
+        <a href="<?php echo esc_url( $video_url ); ?>" class="ai:absolute ai:inset-0 ai:flex ai:flex-col ai:items-center ai:justify-center ai:gap-3 ai:bg-black/25 ai:no-underline ai:transition-colors ai:hover:bg-black/40">
+          <span class="ai:flex ai:size-16 ai:items-center ai:justify-center ai:rounded-full ai:ring-2 ai:ring-inset ai:ring-white/80">
             <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="ai:size-6 ai:text-white"><path d="M8.04 4.92A.9.9 0 0 0 6.7 5.7v12.6a.9.9 0 0 0 1.34.78l10.37-6.3a.9.9 0 0 0 0-1.56L8.04 4.92Z" /></svg>
           </span>
-          <span class="ai:text-base ai:font-semibold ai:text-white"><?php echo esc_html( $video_label ); ?></span>
+          <span class="ai:text-sm ai:font-semibold ai:tracking-wide ai:text-white ai:uppercase"><?php echo esc_html( $video_label ); ?></span>
         </a>
         <?php endif; ?>
       </div>
     </div>
-    <?php endif; ?>
   </div>
+  <?php else : ?>
+  <div class="ai:pb-sec-sm ai:sm:pb-sec"></div>
+  <?php endif; ?>
 </section>
 
 <?php else : ?>
@@ -299,7 +330,7 @@ $rv_panel    = ai_cls( 'ai:relative ai:overflow-hidden ai:rounded-band ai:bg-bra
   <div class="ai:mx-auto ai:grid ai:max-w-wide ai:items-center ai:gap-12 ai:px-4 ai:sm:px-6 ai:lg:grid-cols-2 ai:lg:gap-16 ai:lg:px-8">
     <div>
       <?php if ( $eyebrow ) : ?><p class="<?php echo esc_attr( $pill ); ?>"><?php echo esc_html( $eyebrow ); ?></p><?php endif; ?>
-      <h1 class="ai:m-0 ai:text-4xl ai:font-bold ai:tracking-tight ai:text-balance ai:text-ink ai:sm:text-5xl ai:lg:text-6xl"><?php echo esc_html( $heading ); ?></h1>
+      <h1 class="ai:m-0 ai:text-4xl ai:font-bold ai:tracking-tight ai:text-balance ai:text-ink ai:sm:text-5xl ai:lg:text-6xl"><?php echo esc_html( $heading ); ?><?php if ( $accent ) : ?> <span class="ai:text-brand-600"><?php echo esc_html( $accent ); ?></span><?php endif; ?></h1>
       <?php if ( $text ) : ?><p class="<?php echo esc_attr( $lede ); ?>"><?php echo esc_html( $text ); ?></p><?php endif; ?>
       <div class="ai:mt-10 ai:flex ai:flex-wrap ai:items-center ai:gap-3"><?php ai_hero_buttons( $args ); ?></div>
       <?php if ( $proof ) : ?><p class="<?php echo esc_attr( $note ); ?>"><?php echo esc_html( $proof ); ?></p><?php endif; ?>
