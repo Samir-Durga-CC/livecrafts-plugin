@@ -1,7 +1,7 @@
 <?php
 /**
  * Component: hero
- * Params: variant (split|spotlight|showcase|panel|proof|signup|reveal), eyebrow, heading, accent, text,
+ * Params: variant (split|spotlight|showcase|panel|proof|signup|reveal|wave), eyebrow, heading, accent, text,
  *         primary_label, primary_url, secondary_label, secondary_url, image, proof, action, field_name,
  *         placeholder, button_label, stat_value, stat_label, video_url, video_label, items [ title, text, icon, name ]
  * Shortcode: [ai_hero variant="split" eyebrow="New" heading="..." text="..." primary_label="Start" primary_url="/" image="https://..."]
@@ -12,6 +12,7 @@
  *   proof     - the loud one: the full brand colour, the largest type, three reasons, no picture at all
  *   signup    - full-bleed photograph with a figure on it, message and ONE email field beside it
  *   reveal    - editorial: a serif line in the heading, then a wide picture straddling a deep band
+ *   wave      - the picture held in an organic curve with a painted brand edge, text beside it
  *
  * WHY THEY LOOK DIFFERENT, AND WHY THAT TOOK A SECOND PASS
  * The first version of these varied one thing each - where the picture sat - and kept the same panel, the same
@@ -27,6 +28,7 @@
  *   proof      brand-600         5xl-7xl sans, centred       one column, no image     three reasons with icons
  *   signup     surface           4xl-6xl sans, left          full-bleed half photo    a figure on the photograph
  *   reveal     surface + band    5xl-7xl with a serif line   centred, image straddles the picture itself
+ *   wave       surface           3xl-5xl, a spaced line      curved cut, picture bleeds right   the picture itself
  *
  * "accent" is a short phrase the heading ends with, set apart: in the brand colour on most layouts, and in italic
  * serif on "reveal". It is what lets one line of copy carry a bit of character without a second font file.
@@ -41,7 +43,7 @@
  * Nothing carries a fixed colour: the deep layouts use brand-900 and brand-600, both mixed from the site's own
  * brand, so none of this is navy on a site that is not.
  */
-$variant = in_array( $args['variant'] ?? 'split', array( 'split', 'spotlight', 'showcase', 'panel', 'proof', 'signup', 'reveal' ), true ) ? $args['variant'] : 'split';
+$variant = in_array( $args['variant'] ?? 'split', array( 'split', 'spotlight', 'showcase', 'panel', 'proof', 'signup', 'reveal', 'wave' ), true ) ? $args['variant'] : 'split';
 $eyebrow = $args['eyebrow'] ?? '';
 $heading = $args['heading'] ?? '';
 $accent  = $args['accent'] ?? '';
@@ -323,6 +325,59 @@ $video_label = $args['video_label'] ?? 'Play trailer';
   <?php else : ?>
   <div class="ai:pb-sec-sm ai:sm:pb-sec"></div>
   <?php endif; ?>
+</section>
+
+<?php elseif ( 'wave' === $variant ) : ?>
+<?php
+/**
+ * The picture is cut by an organic curve with a painted brand edge down its left side - the shape every
+ * "landing page" illustration pack uses, which is why it reads as designed rather than as a photo dropped in
+ * a box. Two copies of the same path: one filled with the edge, one used as the clip, offset.
+ *
+ * The ids must be unique or a second hero on the page would clip itself with the first one's shape.
+ */
+$uid = 'lcw' . substr( md5( uniqid( '', true ) ), 0, 8 );
+$blob_edge = 'M176,0 C132,56 212,112 178,176 C144,242 44,268 70,338 C96,408 186,426 196,486 C202,516 228,514 252,520 L560,520 L560,0 Z';
+$blob_clip = 'M210,0 C166,56 246,112 212,176 C178,242 78,268 104,338 C130,408 220,426 230,486 C236,516 262,514 286,520 L560,520 L560,0 Z';
+?>
+<section class="ai-c ai:relative ai:overflow-hidden ai:bg-surface">
+  <div class="ai:relative ai:mx-auto ai:grid ai:max-w-wide ai:items-center ai:gap-10 ai:px-4 ai:py-sec-sm ai:sm:px-6 ai:sm:py-sec ai:lg:grid-cols-2 ai:lg:px-8">
+    <div class="ai:relative ai:z-10">
+      <span class="ai:block ai:h-1.5 ai:w-20 ai:rounded-full ai:bg-gradient-to-r ai:from-brand-600 ai:to-brand-300"></span>
+      <?php if ( $eyebrow ) : ?><p class="ai:m-0 ai:mt-7 ai:text-xs ai:font-semibold ai:tracking-widest ai:uppercase ai:text-brand-700"><?php echo esc_html( $eyebrow ); ?></p><?php endif; ?>
+      <h1 class="ai:m-0 ai:mt-6 ai:text-3xl ai:font-light ai:tracking-tight ai:text-balance ai:text-ink ai:sm:text-4xl ai:lg:text-5xl"><?php echo esc_html( $heading ); ?></h1>
+      <?php if ( $accent ) : ?>
+      <!-- the accent is a line of its own here, widely spaced: the quiet second line of a title block -->
+      <p class="ai:m-0 ai:mt-3 ai:text-lg ai:font-light ai:tracking-[.3em] ai:uppercase ai:text-muted ai:sm:text-xl"><?php echo esc_html( $accent ); ?></p>
+      <?php endif; ?>
+      <?php if ( $text ) : ?><p class="ai:mt-7 ai:mb-0 ai:max-w-sm ai:text-sm/8 ai:text-pretty ai:text-muted"><?php echo esc_html( $text ); ?></p><?php endif; ?>
+      <div class="ai:mt-9 ai:flex ai:flex-wrap ai:items-center ai:gap-3"><?php ai_hero_buttons( $args ); ?></div>
+      <?php if ( $proof ) : ?><p class="<?php echo esc_attr( $note ); ?>"><?php echo esc_html( $proof ); ?></p><?php endif; ?>
+    </div>
+
+    <!-- In the grid on a phone, pinned to the right edge from lg up so the curve bleeds off the section. -->
+    <div class="ai:relative ai:order-first ai:h-64 ai:w-full ai:sm:h-80 ai:lg:absolute ai:lg:inset-y-0 ai:lg:right-0 ai:lg:order-none ai:lg:h-auto ai:lg:w-1/2">
+      <svg viewBox="0 0 560 520" preserveAspectRatio="xMidYMid slice" class="ai:absolute ai:inset-0 ai:size-full ai:text-brand-600" aria-hidden="true">
+        <defs>
+          <!-- currentColor, so the edge is the site's brand; the stops only vary its strength -->
+          <linearGradient id="<?php echo esc_attr( $uid ); ?>g" x1="0" y1="1" x2="1" y2="0">
+            <stop offset="0" stop-color="currentColor" stop-opacity=".72"/>
+            <stop offset=".55" stop-color="currentColor" stop-opacity=".42"/>
+            <stop offset="1" stop-color="currentColor" stop-opacity=".16"/>
+          </linearGradient>
+          <clipPath id="<?php echo esc_attr( $uid ); ?>c"><path d="<?php echo esc_attr( $blob_clip ); ?>"/></clipPath>
+        </defs>
+        <path fill="url(#<?php echo esc_attr( $uid ); ?>g)" d="<?php echo esc_attr( $blob_edge ); ?>"/>
+        <g clip-path="url(#<?php echo esc_attr( $uid ); ?>c)">
+          <!-- a tint under the picture, so the shape is still a shape when no picture was given -->
+          <rect x="40" y="0" width="520" height="520" class="ai:fill-brand-50"/>
+          <?php if ( $image ) : ?>
+          <image href="<?php echo esc_url( $image ); ?>" x="40" y="0" width="520" height="520" preserveAspectRatio="xMidYMid slice"/>
+          <?php endif; ?>
+        </g>
+      </svg>
+    </div>
+  </div>
 </section>
 
 <?php else : ?>

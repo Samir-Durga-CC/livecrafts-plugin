@@ -165,6 +165,12 @@ function livecrafts_template_sample( $id, $variant = '' ) {
 				'placeholder' => 'Enter your email to start', 'proof' => 'Instant access. No card needed.',
 				'stat_value' => '395', 'stat_label' => 'Teams started this month',
 			),
+			'wave'      => array(
+				'image' => $shot, 'eyebrow' => '',
+				'heading' => 'Your workspace', 'accent' => 'Landing pages',
+				'text' => 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
+				'secondary_label' => '',
+			),
 			'reveal'    => array(
 				'image' => $shot, 'video_url' => '#', 'video_label' => 'Watch the tour',
 				'eyebrow' => 'A short film',
