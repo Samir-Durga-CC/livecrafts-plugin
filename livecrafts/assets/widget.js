@@ -407,37 +407,134 @@
 				var doc = new DOMParser().parseFromString(html, "text/html");
 				var fresh = doc.body, live = document.body;
 				if (!fresh || !live) throw new Error("no body");
-				var a = Array.prototype.filter.call(live.children, keepable);
-				var b = Array.prototype.filter.call(fresh.children, keepable);
-				if (a.length > 80 || b.length > 80) throw new Error("too many blocks to patch in place");
-				var changed = 0;
-				if (a.length === b.length) {
-					// same shape: replace only the blocks whose markup differs. The cheap signature (tag, id, class,
-					// child count, text length) is checked first, so the expensive comparison runs on few blocks.
-					for (var i = 0; i < a.length; i++) {
-						if (sig(a[i]) === sig(b[i])) continue;
-						if (a[i].outerHTML === b[i].outerHTML) continue;
-						a[i].replaceWith(b[i].cloneNode(true));
-						changed++;
+
+				/**
+				 * The new section may need a stylesheet this page has never loaded.
+				 *
+				 * The template library's CSS is enqueued only on pages that actually render a component, so the FIRST
+				 * section placed on a page arrives with its stylesheet missing from the document - and patching the
+				 * markup in alone put unstyled markup on screen: the broken page that needed two manual refreshes to
+				 * come right. So the head is brought up to date first, and the body is not touched until the new
+				 * stylesheets have actually loaded.
+				 */
+				return syncHead(doc).then(function () {
+					var a = Array.prototype.filter.call(live.children, keepable);
+					var b = Array.prototype.filter.call(fresh.children, keepable);
+					if (a.length > 80 || b.length > 80) throw new Error("too many blocks to patch in place");
+					var changed = 0;
+					if (a.length === b.length) {
+						// same shape: replace only the blocks whose markup differs. The cheap signature (tag, id, class,
+						// child count, text length) is checked first, so the expensive comparison runs on few blocks.
+						var swap = [];
+						for (var i = 0; i < a.length; i++) {
+							if (sig(a[i]) === sig(b[i])) continue;
+							if (a[i].outerHTML === b[i].outerHTML) continue;
+							swap.push(i);
+						}
+						// Markup that brings its own script cannot be patched in: a cloned script never runs, so the
+						// slider, menu or accordion inside it would sit there dead. That page gets a real reload instead.
+						if (swap.some(function (i) { return hasScript(b[i]); })) throw new Error("the new markup brings scripts of its own");
+						swap.forEach(function (i) { a[i].replaceWith(b[i].cloneNode(true)); changed++; });
+					} else {
+						// A section was added or removed. Rebuilding the blocks re-creates every one of them, so anything
+						// the theme's JavaScript had set up on them (sticky header, slider, menu, accordion) is gone and
+						// does not come back without a reload - which is exactly what looked broken. Only a page whose
+						// blocks carry no scripts at all is safe to rebuild in place; anything else is reloaded.
+						if (Array.prototype.some.call(fresh.children, hasScript) || Array.prototype.some.call(live.children, hasScript)) {
+							throw new Error("a section was added and the page runs scripts of its own");
+						}
+						for (var j = 0; j < a.length; j++) a[j].remove();
+						var at = live.firstChild;
+						for (var k = 0; k < b.length; k++) live.insertBefore(b[k].cloneNode(true), at);
+						changed = Math.abs(b.length - a.length) + 1;
 					}
-				} else {
-					// a section was added or removed: rebuild the page's blocks, keeping everything of ours
-					for (var j = 0; j < a.length; j++) a[j].remove();
-					var at = live.firstChild;
-					for (var k = 0; k < b.length; k++) live.insertBefore(b[k].cloneNode(true), at);
-					changed = Math.abs(b.length - a.length) + 1;
-				}
-				if (changed && selector) {
-					var el = document.querySelector(selector);
-					if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); outline(el); }
-				}
-				send({ type: "lc:refreshed", changed: changed, soft: true });
-				return changed;
+					if (changed && selector) {
+						var el = document.querySelector(selector);
+						if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); outline(el); }
+					}
+					send({ type: "lc:refreshed", changed: changed, soft: true });
+					return changed;
+				});
 			})
 			.catch(function (e) {
-				// Could not patch it in place: say so, and let the person refresh when they want to.
-				send({ type: "lc:refreshed", changed: 0, soft: false, error: e && e.message ? e.message : String(e) });
+				/**
+				 * Could not patch it in place - so show the change the sure way, by reloading, instead of leaving a
+				 * half-updated page on screen for the person to refresh themselves (twice, as it turned out: the plain
+				 * refresh they reached for was served the very page they already had).
+				 */
+				send({ type: "lc:refreshed", changed: 0, soft: false, reloading: true, error: e && e.message ? e.message : String(e) });
+				state.open = true; save(); // the panel comes back open, on the same tab, exactly as after lc:reload
+				hardReload();
 			});
+	}
+
+	/** Does this block contain a script? Cloned scripts never run, so such a block cannot be patched in. */
+	function hasScript(el) {
+		return el.tagName === "SCRIPT" || !!el.querySelector("script");
+	}
+
+	/** A stylesheet or script URL without our own cache-busting parameters, so the same file is recognised as the same. */
+	function assetKey(u) {
+		try {
+			var x = new URL(u, location.href);
+			x.searchParams.delete("lcfresh"); x.searchParams.delete("lcv");
+			return x.origin + x.pathname + x.search;
+		} catch (e) { return String(u); }
+	}
+
+	/**
+	 * Bring the head up to date with the page as it is served now, and resolve once the new stylesheets have loaded.
+	 *
+	 * Stylesheets and inline style blocks are added, never removed: taking one away mid-patch would unstyle the page for
+	 * as long as the patch takes, and an unused stylesheet costs nothing. A newly added script src cannot be dealt with
+	 * this way - it has to run in order, from the top of a fresh document - so that page is reloaded instead.
+	 */
+	function syncHead(doc) {
+		var head = doc.head, live = document.head;
+		if (!head || !live) return Promise.resolve();
+
+		var haveScripts = {};
+		Array.prototype.forEach.call(document.querySelectorAll("script[src]"), function (n) { haveScripts[assetKey(n.src)] = 1; });
+		var newScript = Array.prototype.some.call(doc.querySelectorAll("script[src]"), function (n) {
+			var src = n.getAttribute("src") || "";
+			return !!src && !haveScripts[assetKey(src)];
+		});
+		if (newScript) return Promise.reject(new Error("the page now loads scripts it did not have"));
+
+		var haveStyles = {};
+		Array.prototype.forEach.call(live.querySelectorAll('link[rel~="stylesheet"][href]'), function (n) { haveStyles[assetKey(n.href)] = 1; });
+		var waits = [];
+		Array.prototype.forEach.call(head.querySelectorAll('link[rel~="stylesheet"][href]'), function (n) {
+			var href = n.getAttribute("href") || "";
+			if (!href || haveStyles[assetKey(href)]) return;
+			haveStyles[assetKey(href)] = 1;
+			var link = document.createElement("link");
+			link.rel = "stylesheet";
+			link.href = new URL(href, location.href).href;
+			if (n.media) link.media = n.media;
+			link.setAttribute("data-lc-synced", "1");
+			waits.push(new Promise(function (done) {
+				link.addEventListener("load", done);
+				link.addEventListener("error", done);
+				setTimeout(done, 3000); // never hold the page back longer than this
+			}));
+			live.appendChild(link);
+		});
+
+		// Inline style the page did not have (the library's brand variables and a section's "fit" arrive this way).
+		var haveInline = {};
+		Array.prototype.forEach.call(live.querySelectorAll("style"), function (n) { haveInline[(n.textContent || "").trim()] = 1; });
+		Array.prototype.forEach.call(head.querySelectorAll("style"), function (n) {
+			var css = (n.textContent || "").trim();
+			if (!css || haveInline[css]) return;
+			haveInline[css] = 1;
+			var s = document.createElement("style");
+			s.setAttribute("data-lc-synced", "1");
+			s.textContent = css;
+			live.appendChild(s);
+		});
+
+		return waits.length ? Promise.all(waits).then(function () { /* the new stylesheets are in */ }) : Promise.resolve();
 	}
 
 	/** A cheap fingerprint of a block: enough to tell "certainly unchanged" without serialising the whole subtree. */
