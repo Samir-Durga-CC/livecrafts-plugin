@@ -142,7 +142,7 @@
 	 */
 	function measureLayout() {
 		try {
-			var vw = document.documentElement.clientWidth, tally = {}, best = null;
+			var vw = document.documentElement.clientWidth, tally = {}, byKey = {}, best = null;
 			var els = document.querySelectorAll("body *");
 			for (var i = 0; i < els.length && i < 6000; i++) {
 				var el = els[i];
@@ -157,12 +157,50 @@
 				var full = cs.boxSizing === "border-box" ? mw : mw + pl + pr;
 				var key = Math.round(full) + "|" + Math.round(Math.min(pl, pr));
 				tally[key] = (tally[key] || 0) + (el.closest("header, .site-header, #masthead") ? 3 : 1);
+				(byKey[key] = byKey[key] || []).push(el);
 			}
 			Object.keys(tally).forEach(function (k) { if (!best || tally[k] > tally[best]) best = k; });
 			if (!best) return null;
 			var parts = best.split("|");
-			return { container: Number(parts[0]), gutter: Number(parts[1]), viewport: vw };
+			return { container: Number(parts[0]), gutter: Number(parts[1]), viewport: vw, className: containerClass(byKey[best] || []) };
 		} catch (e) { return null; }
+	}
+
+	/**
+	 * The theme's own class for that box ("wrap", "container"...), when the class ALONE makes it: a bare probe with just
+	 * that class, at the top of the body, gets the same width and padding and adds no background or border. A section
+	 * wearing it then follows the theme at every screen size - its own breakpoints, not a guess from one width.
+	 */
+	function containerClass(els) {
+		var counts = {};
+		els.forEach(function (el) {
+			Array.prototype.forEach.call(el.classList, function (c) {
+				if (/^[A-Za-z_][\w-]{0,40}$/.test(c) && !/^(lcw|lcs|wp-|elementor|e-con|is-|has-|js-|active|open)/.test(c)) counts[c] = (counts[c] || 0) + 1;
+			});
+		});
+		var want = els[0] ? boxOf(els[0]) : null, names = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; });
+		if (!want) return null;
+		var holder = document.createElement("div");
+		holder.setAttribute("aria-hidden", "true");
+		holder.style.cssText = "position:absolute;left:0;top:0;width:100%;height:0;overflow:hidden;visibility:hidden;pointer-events:none";
+		document.body.appendChild(holder);
+		try {
+			for (var i = 0; i < names.length && i < 8; i++) {
+				var probe = document.createElement("div");
+				probe.className = names[i];
+				holder.appendChild(probe);
+				var got = boxOf(probe), cs = getComputedStyle(probe); // read before the probe leaves the page
+				var plain = /^(block|flow-root)$/.test(cs.display) && cs.backgroundImage === "none" && /rgba\(0, 0, 0, 0\)|transparent/.test(cs.backgroundColor) && parseFloat(cs.borderLeftWidth) === 0;
+				holder.removeChild(probe);
+				if (plain && got && got.max === want.max && got.pad === want.pad) return names[i];
+			}
+		} finally { document.body.removeChild(holder); }
+		return null;
+	}
+	function boxOf(el) {
+		var cs = getComputedStyle(el), mw = parseFloat(cs.maxWidth);
+		if (!(mw > 0)) return null;
+		return { max: Math.round(mw), pad: Math.round(parseFloat(cs.paddingLeft) || 0) + "/" + Math.round(parseFloat(cs.paddingRight) || 0) };
 	}
 
 	// ------------------------------------------------------------------ element picker
@@ -342,7 +380,7 @@
 		else if (d.type === "lc:close") { close(); }
 		// The Section Gallery: the panel becomes a large popup over the dimmed page while the gallery is open (0.24).
 		else if (d.type === "lc:wide") { root.classList.toggle("lcw-wide", !!d.on); }
-		// The Section Gallery: how wide this site's content is, so a section lines up with the theme (0.24.3).
+		// The Section Gallery: how wide this site's content is, so a section lines up with the theme (0.24.3; its container class 0.24.4).
 		else if (d.type === "lc:measure") { send({ type: "lc:measure-result", id: d.id, layout: measureLayout() }); }
 		else if (d.type === "lc:tab") { state.tab = d.tab; save(); }
 		else if (d.type === "lc:highlight" && d.selector) {
