@@ -146,6 +146,28 @@ add_action( 'get_footer', function () {
 	}
 }, 5 );
 
+/**
+ * Does the theme print this page's own content (the_content)? Many custom templates do not, and then anything saved in
+ * the content - blocks, a section from the gallery - never shows. Recorded on an editor's view, like the parts above:
+ * '1' when the page's content was printed, '0' when the page finished without it.
+ */
+add_filter( 'the_content', function ( $content ) {
+	$post_id = livecrafts_sections_post();
+	if ( $post_id && (int) get_the_ID() === $post_id ) livecrafts_sections_content_seen( true );
+	return $content;
+}, 1 );
+add_action( 'wp_footer', function () {
+	$post_id = livecrafts_sections_post();
+	if ( ! $post_id || ! livecrafts_user_can_edit() ) return;
+	$now = livecrafts_sections_content_seen() ? '1' : '0';
+	if ( get_post_meta( $post_id, '_livecrafts_shows_content', true ) !== $now ) update_post_meta( $post_id, '_livecrafts_shows_content', $now );
+}, 1 );
+function livecrafts_sections_content_seen( $set = null ) {
+	static $seen = false;
+	if ( $set ) $seen = true;
+	return $seen;
+}
+
 /* ------------------------------------------------------------------ what the assistant is told */
 
 /**
@@ -160,8 +182,11 @@ function livecrafts_sections_map( $post_id ) {
 		$places[] = 'before:' . $slug;
 		$places[] = 'after:' . $slug;
 	}
+	$shows = get_post_meta( $post_id, '_livecrafts_shows_content', true );
 	return array(
 		'themeParts' => $parts,
+		// true / false once an editor has opened the page, null before that.
+		'showsContent' => $shows === '' ? null : $shows === '1',
 		'places'     => $places,
 		'current'    => array_map( function ( $s ) {
 			return array( 'anchor' => $s['anchor'], 'content' => mb_substr( $s['content'], 0, 200 ) );

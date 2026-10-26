@@ -546,7 +546,9 @@ function livecrafts_acf_rows_revert( array $c ) {
  * it is cleaned like post content, so a theme-built page can never be given a script.
  */
 function livecrafts_kind_theme_section_prepare( $post_id, $target, $value, array $draft ) {
-	$anchor = livecrafts_sections_clean_anchor( $target );
+	// "append:<place>" (0.24.2, the Section Gallery): add below what is already at that place instead of replacing it.
+	$append = strpos( (string) $target, 'append:' ) === 0;
+	$anchor = livecrafts_sections_clean_anchor( $append ? substr( (string) $target, 7 ) : $target );
 	if ( ! $anchor ) {
 		return new WP_Error( 'livecrafts_bad_target', 'A section needs a place: "before:<template part>", "after:<template part>", "start" or "end". GET /map lists the places this page has (sections.places).' );
 	}
@@ -554,6 +556,14 @@ function livecrafts_kind_theme_section_prepare( $post_id, $target, $value, array
 	if ( mb_strlen( $content ) > 20000 ) return new WP_Error( 'livecrafts_too_long', 'That section is too long (max 20000 characters). Place a template shortcode instead of markup.' );
 	$clean = $content === '' ? '' : trim( wp_kses_post( $content ) );
 	if ( $content !== '' && $clean === '' ) return new WP_Error( 'livecrafts_empty', 'Nothing of that section survived cleaning. Place a template shortcode (see GET /templates).' );
+	if ( $append && $clean !== '' ) {
+		$before = '';
+		foreach ( (array) ( isset( $draft['meta'][ LIVECRAFTS_SECTIONS_META ] ) ? $draft['meta'][ LIVECRAFTS_SECTIONS_META ] : array() ) as $row ) {
+			if ( is_array( $row ) && isset( $row['anchor'] ) && $row['anchor'] === $anchor ) $before = (string) $row['content'];
+		}
+		if ( $before !== '' ) $clean = $before . "\n" . $clean;
+		if ( mb_strlen( $clean ) > 60000 ) return new WP_Error( 'livecrafts_too_long', 'There are too many sections in that place already. Pick another place on the page.' );
+	}
 	$where = $anchor === 'start' ? 'at the top of the page' : ( $anchor === 'end' ? 'at the end of the page' : str_replace( ':', ' the theme part ', $anchor ) );
 	$what  = preg_match( '/\[([a-z0-9_]+)/i', $clean, $m ) ? 'the ' . str_replace( 'ai_', '', $m[1] ) . ' template' : 'a section';
 	return array(
