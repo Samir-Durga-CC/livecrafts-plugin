@@ -43,7 +43,8 @@ function livecrafts_update_manifest( $force = false ) {
 	}
 	// The site and version travel with the request so the feed can show who is on what; nothing else is sent.
 	$url = add_query_arg(
-		array( 'site' => rawurlencode( untrailingslashit( home_url() ) ), 'version' => LIVECRAFTS_VERSION ),
+		array( 'site' => untrailingslashit( home_url() ), 'version' => LIVECRAFTS_VERSION ), // add_query_arg encodes these
+
 		LIVECRAFTS_UPDATE_BASE . '/' . $channel . '/livecrafts.json'
 	);
 	$res  = wp_remote_get( $url, array( 'timeout' => 10, 'headers' => array( 'Accept' => 'application/json' ) ) );
