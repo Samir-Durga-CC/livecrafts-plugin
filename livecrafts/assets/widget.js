@@ -134,6 +134,37 @@
 
 	function send(msg) { if (frame && frame.contentWindow) frame.contentWindow.postMessage(msg, backendOrigin); }
 
+	// ------------------------------------------------------------------ the site's content width (Section Gallery)
+	/**
+	 * Themes keep their content in a centred box ("container", "wrap", "inner"...) with a max-width and side padding.
+	 * Find the one the page uses most - the header's counts more, it is the line everything else follows - and report
+	 * its full width and side padding, so gallery sections can use exactly the same box. null when there is none.
+	 */
+	function measureLayout() {
+		try {
+			var vw = document.documentElement.clientWidth, tally = {}, best = null;
+			var els = document.querySelectorAll("body *");
+			for (var i = 0; i < els.length && i < 6000; i++) {
+				var el = els[i];
+				if (el.closest(".lcs, .livecrafts-section, .lcw-root, #wpadminbar, script, style, svg")) continue;
+				var cs = getComputedStyle(el);
+				var mw = parseFloat(cs.maxWidth);
+				if (!(mw >= 600 && mw <= 2600)) continue;
+				var r = el.getBoundingClientRect();
+				if (r.width < 300 || r.height < 10) continue;
+				if (Math.abs(r.left - (vw - r.right)) > 2) continue; // centred on the page
+				var pl = parseFloat(cs.paddingLeft) || 0, pr = parseFloat(cs.paddingRight) || 0;
+				var full = cs.boxSizing === "border-box" ? mw : mw + pl + pr;
+				var key = Math.round(full) + "|" + Math.round(Math.min(pl, pr));
+				tally[key] = (tally[key] || 0) + (el.closest("header, .site-header, #masthead") ? 3 : 1);
+			}
+			Object.keys(tally).forEach(function (k) { if (!best || tally[k] > tally[best]) best = k; });
+			if (!best) return null;
+			var parts = best.split("|");
+			return { container: Number(parts[0]), gutter: Number(parts[1]), viewport: vw };
+		} catch (e) { return null; }
+	}
+
 	// ------------------------------------------------------------------ element picker
 	var picking = false, hovered = null;
 	function startPick() {
@@ -311,6 +342,8 @@
 		else if (d.type === "lc:close") { close(); }
 		// The Section Gallery: the panel becomes a large popup over the dimmed page while the gallery is open (0.24).
 		else if (d.type === "lc:wide") { root.classList.toggle("lcw-wide", !!d.on); }
+		// The Section Gallery: how wide this site's content is, so a section lines up with the theme (0.24.3).
+		else if (d.type === "lc:measure") { send({ type: "lc:measure-result", id: d.id, layout: measureLayout() }); }
 		else if (d.type === "lc:tab") { state.tab = d.tab; save(); }
 		else if (d.type === "lc:highlight" && d.selector) {
 			try { var el = document.querySelector(d.selector); if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); outline(el); setTimeout(function () { if (!picking) box.hidden = true; }, 1800); } } catch (x) { /* bad selector */ }
