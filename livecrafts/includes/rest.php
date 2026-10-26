@@ -62,6 +62,8 @@ add_action( 'rest_api_init', function () {
 	$route( '/preview-token', 'POST', 'livecrafts_rest_preview_token' );
 	$route( '/connect', 'POST', 'livecrafts_rest_connect', function () { return current_user_can( 'manage_options' ); } );
 	$route( '/debug/target', 'GET', 'livecrafts_rest_debug_target' );
+	$route( '/sections/site', 'GET', 'livecrafts_rest_sections_site_get' );   // the Section Gallery's site settings (0.24.6)
+	$route( '/sections/site', 'POST', 'livecrafts_rest_sections_site_set' );
 } );
 
 /** Options every change-making route shares: who it is credited to, where it came from, the backend's reference. */

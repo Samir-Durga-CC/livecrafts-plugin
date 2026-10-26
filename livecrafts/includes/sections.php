@@ -70,7 +70,7 @@ function livecrafts_sections_post() {
 
 /** Print one section's content (shortcodes run; the markup is the library's own). */
 function livecrafts_sections_print( $content ) {
-	echo '<div class="livecrafts-section" data-livecrafts-section="1">' . do_shortcode( (string) $content ) . '</div>';
+	echo '<div class="livecrafts-section" data-livecrafts-section="1">' . livecrafts_lcs_fit( do_shortcode( (string) $content ) ) . '</div>';
 }
 
 /**
@@ -166,6 +166,41 @@ function livecrafts_sections_content_seen( $set = null ) {
 	static $seen = false;
 	if ( $set ) $seen = true;
 	return $seen;
+}
+
+/* ------------------------------------------------------------------ the theme's container class (Section Gallery) */
+
+/**
+ * The theme's own class for its content box ("wrap", "container"...), as the gallery found it on the site's page.
+ * Every gallery section wears it when the page is shown - including sections added before it was known - so they
+ * follow the theme's width and side padding at every breakpoint. Only gallery markup is touched (class="lcs-in").
+ */
+define( 'LIVECRAFTS_LCS_CONTAINER', 'livecrafts_lcs_container' );
+
+function livecrafts_lcs_container() {
+	$c = (string) get_option( LIVECRAFTS_LCS_CONTAINER, '' );
+	return preg_match( '/^[A-Za-z_][A-Za-z0-9_-]{0,40}$/', $c ) ? $c : '';
+}
+
+function livecrafts_lcs_fit( $html ) {
+	$c = livecrafts_lcs_container();
+	if ( $c === '' || strpos( (string) $html, 'lcs-in' ) === false ) return $html;
+	return preg_replace_callback( '/class="lcs-in(?=[\s"])([^"]*)"/', function ( $m ) use ( $c ) {
+		return preg_match( '/(^|\s)' . preg_quote( $c, '/' ) . '(\s|$)/', $m[1] ) ? $m[0] : 'class="lcs-in ' . $c . $m[1] . '"';
+	}, (string) $html );
+}
+add_filter( 'the_content', 'livecrafts_lcs_fit', 99 );
+add_filter( 'elementor/frontend/the_content', 'livecrafts_lcs_fit', 99 );
+
+function livecrafts_rest_sections_site_get() {
+	return array( 'ok' => true, 'containerClass' => livecrafts_lcs_container() );
+}
+function livecrafts_rest_sections_site_set( WP_REST_Request $req ) {
+	if ( ! current_user_can( 'edit_theme_options' ) && ! current_user_can( 'edit_pages' ) ) return new WP_Error( 'livecrafts_forbidden', 'You cannot change this site\'s sections.', array( 'status' => 403 ) );
+	$c = trim( (string) $req->get_param( 'containerClass' ) );
+	if ( $c !== '' && ! preg_match( '/^[A-Za-z_][A-Za-z0-9_-]{0,40}$/', $c ) ) return new WP_Error( 'livecrafts_bad_class', 'containerClass must be one plain class name.', array( 'status' => 400 ) );
+	if ( $c !== livecrafts_lcs_container() ) update_option( LIVECRAFTS_LCS_CONTAINER, $c, false );
+	return array( 'ok' => true, 'containerClass' => livecrafts_lcs_container() );
 }
 
 /* ------------------------------------------------------------------ what the assistant is told */
