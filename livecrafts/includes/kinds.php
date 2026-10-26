@@ -546,6 +546,22 @@ function livecrafts_acf_rows_revert( array $c ) {
  * it is cleaned like post content, so a theme-built page can never be given a script.
  */
 function livecrafts_kind_theme_section_prepare( $post_id, $target, $value, array $draft ) {
+	// "edit:<place>|<section>|<path>|<field>" (0.24.7): one text, link or picture inside a gallery section (lcs-edit.php).
+	if ( strpos( (string) $target, 'edit:' ) === 0 ) {
+		$bits = explode( '|', substr( (string) $target, 5 ) );
+		if ( count( $bits ) !== 4 || ! ( $anchor = livecrafts_sections_clean_anchor( $bits[0] ) ) || ! ctype_digit( $bits[1] ) || ! preg_match( '/^(\d{1,3}(\.\d{1,3}){0,20})?$/', $bits[2] ) ) {
+			return new WP_Error( 'livecrafts_bad_target', 'That section edit has the wrong shape.' );
+		}
+		$now = '';
+		foreach ( (array) ( isset( $draft['meta'][ LIVECRAFTS_SECTIONS_META ] ) ? $draft['meta'][ LIVECRAFTS_SECTIONS_META ] : array() ) as $row ) {
+			if ( is_array( $row ) && isset( $row['anchor'] ) && $row['anchor'] === $anchor ) $now = (string) $row['content'];
+		}
+		if ( $now === '' ) return new WP_Error( 'livecrafts_stale', 'That section is no longer on the page.', array( 'status' => 409 ) );
+		$r = livecrafts_lcs_apply( $now, (int) $bits[1], $bits[2], $bits[3], $value );
+		if ( is_wp_error( $r ) ) return $r;
+		$clean = trim( wp_kses_post( $r[0] ) );
+		return array( 'target' => $anchor, 'after' => $clean, 'payload' => array( 'anchor' => $anchor, 'edit' => $bits[3] ), 'summary' => $r[1] );
+	}
 	// "append:<place>" (0.24.2, the Section Gallery): add below what is already at that place instead of replacing it.
 	$append = strpos( (string) $target, 'append:' ) === 0;
 	$anchor = livecrafts_sections_clean_anchor( $append ? substr( (string) $target, 7 ) : $target );

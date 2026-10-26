@@ -69,8 +69,10 @@ function livecrafts_sections_post() {
 }
 
 /** Print one section's content (shortcodes run; the markup is the library's own). */
-function livecrafts_sections_print( $content ) {
-	echo '<div class="livecrafts-section" data-livecrafts-section="1">' . livecrafts_lcs_fit( do_shortcode( (string) $content ) ) . '</div>';
+function livecrafts_sections_print( $content, $anchor = '' ) {
+	// Editors' pages say where the section is stored, so a click on it can be edited at its source (resolve.php).
+	$where = $anchor !== '' && livecrafts_user_can_edit() ? ' data-lc-anchor="' . esc_attr( $anchor ) . '"' : '';
+	echo '<div class="livecrafts-section" data-livecrafts-section="1"' . $where . '>' . livecrafts_lcs_fit( do_shortcode( (string) $content ) ) . '</div>';
 }
 
 /**
@@ -111,8 +113,8 @@ function livecrafts_sections_at_part( $slug, $name = null ) {
 	foreach ( livecrafts_sections_get( $post_id ) as $row ) {
 		list( $where, $target ) = array_pad( explode( ':', $row['anchor'], 2 ), 2, '' );
 		if ( $target !== $slug ) continue;
-		if ( $where === 'before' ) livecrafts_sections_print( $row['content'] );
-		if ( $where === 'after' ) livecrafts_sections_pending( $row['content'] );
+		if ( $where === 'before' ) livecrafts_sections_print( $row['content'], $row['anchor'] );
+		if ( $where === 'after' ) livecrafts_sections_pending( array( $row['content'], $row['anchor'] ) );
 	}
 }
 
@@ -124,7 +126,7 @@ function livecrafts_sections_pending( $content = null ) {
 	return $queue;
 }
 function livecrafts_sections_flush_pending() {
-	foreach ( livecrafts_sections_pending( null ) as $content ) livecrafts_sections_print( $content );
+	foreach ( livecrafts_sections_pending( null ) as $row ) livecrafts_sections_print( $row[0], $row[1] );
 }
 
 /** Right after <body> opens. */
@@ -132,7 +134,7 @@ add_action( 'wp_body_open', function () {
 	$post_id = livecrafts_sections_post();
 	if ( ! $post_id ) return;
 	foreach ( livecrafts_sections_get( $post_id ) as $row ) {
-		if ( $row['anchor'] === 'start' ) livecrafts_sections_print( $row['content'] );
+		if ( $row['anchor'] === 'start' ) livecrafts_sections_print( $row['content'], 'start' );
 	}
 }, 5 );
 
@@ -142,7 +144,7 @@ add_action( 'get_footer', function () {
 	if ( ! $post_id ) return;
 	livecrafts_sections_flush_pending();
 	foreach ( livecrafts_sections_get( $post_id ) as $row ) {
-		if ( $row['anchor'] === 'end' ) livecrafts_sections_print( $row['content'] );
+		if ( $row['anchor'] === 'end' ) livecrafts_sections_print( $row['content'], 'end' );
 	}
 }, 5 );
 

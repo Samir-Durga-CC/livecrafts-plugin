@@ -65,6 +65,9 @@ function livecrafts_rest_resolve( WP_REST_Request $req ) {
 	if ( ! $r && preg_match( '/^(\d+):(\d{1,4}(?:\.\d{1,4}){0,9})$/', (string) $req->get_param( 'divi' ), $m ) && current_user_can( 'edit_post', (int) $m[1] ) ) {
 		$r = livecrafts_resolve_divi( (int) $m[1], $m[2], $device, (string) $req->get_param( 'selector' ), (string) $req->get_param( 'tag' ) );
 	}
+	if ( ! $r && $page && (string) $req->get_param( 'lcs' ) !== '' && current_user_can( 'edit_post', $page ) ) {
+		$r = livecrafts_resolve_lcs( $page, (string) $req->get_param( 'lcs' ), $device, (string) $req->get_param( 'selector' ), (string) $req->get_param( 'tag' ) );
+	}
 	if ( ! $r && $page && current_user_can( 'edit_post', $page ) ) {
 		$r = livecrafts_resolve_acf( $page, $req );
 	}

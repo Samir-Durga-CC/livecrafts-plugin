@@ -308,7 +308,7 @@
 	function resolve(snap) {
 		return wp("POST", "resolve", {
 			page: Number(C.postId) || 0, device: deviceOf(window.innerWidth), elementor: snap.elementor ? { doc: snap.elementor.post, id: snap.elementor.id } : null,
-			block: snap.block || "", divi: snap.divi || "", menuItem: snap.menuItem || 0, tag: snap.tag, text: snap.rawText || snap.text,
+			block: snap.block || "", divi: snap.divi || "", menuItem: snap.menuItem || 0, lcs: snap.lcs || "", tag: snap.tag, text: snap.rawText || snap.text,
 			imageSrc: snap.image ? snap.image.src : "", bgImage: snap.bgImage || "", href: snap.link || "", selector: snap.selector,
 		});
 	}
@@ -323,6 +323,22 @@
 		var d = el.closest && el.closest("[class*='lcd-']");
 		var m = d && /(?:^|\s)lcd-(\d+(?:-\d+)*)(?:\s|$)/.exec(d.className || "");
 		return m ? (Number(C.postId) || 0) + ":" + m[1].split("-").join(".") : "";
+	}
+	/**
+	 * A part of a gallery section Livecrafts shows on a theme-built page: "<anchor>|<section index>|<path>", the path
+	 * being element-child indexes from the section down to the click (0.24.7). The plugin finds the same element in
+	 * the stored markup, so its text, link or picture can be edited at the source.
+	 */
+	function lcsOf(el) {
+		var sec = el.closest && el.closest("section.lcs"), host = sec && sec.closest("[data-lc-anchor]");
+		if (!sec || !host) return "";
+		var path = [], cur = el;
+		while (cur && cur !== sec) {
+			path.unshift(Array.prototype.indexOf.call(cur.parentElement.children, cur));
+			cur = cur.parentElement;
+		}
+		var index = Array.prototype.indexOf.call(host.querySelectorAll("section.lcs"), sec);
+		return host.getAttribute("data-lc-anchor") + "|" + index + "|" + path.join(".");
 	}
 	/** The classic menu link this element belongs to (WordPress puts menu-item-<id> on each item). */
 	function menuItemOf(el) {
@@ -361,7 +377,7 @@
 			link: el.closest && el.closest("a") ? el.closest("a").href : "",
 			styles: styles, rect: { width: Math.round(r.width), height: Math.round(r.height) },
 			section: sectionOf(el), pageUrl: location.href.split("#")[0].replace(/[?&]lcv=\d+/, ""), viewport: window.innerWidth,
-			pageKey: C.pageKey || "", elementor: elementorOf(el), hasChildren: hasMarkup(el), block: blockOf(el), divi: diviOf(el), menuItem: menuItemOf(el),
+			pageKey: C.pageKey || "", elementor: elementorOf(el), hasChildren: hasMarkup(el), block: blockOf(el), divi: diviOf(el), menuItem: menuItemOf(el), lcs: lcsOf(el),
 			similarSelector: similar.selector, similarCount: similar.count,
 		};
 	}
