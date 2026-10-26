@@ -1,0 +1,61 @@
+name: Publish update feed
+
+# staging -> the staging channel (test sites), main -> the stable channel (client sites).
+# Nothing is published unless "Version:" in livecrafts/livecrafts.php changed: publish.mjs refuses a version the
+# channel already offers, which is what stops a release going out twice under one number.
+on:
+  push:
+    branches: [staging, main]
+    paths:
+      - 'livecrafts/**'
+      - 'tools/**'
+      - '.github/workflows/release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      HOSTINGER_API_TOKEN: ${{ secrets.HOSTINGER_API_TOKEN }}
+      HOSTINGER_USERNAME: ${{ secrets.HOSTINGER_USERNAME }}
+      HOSTINGER_DOMAIN: project-in-progress.com
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pick the channel
+        run: |
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "CHANNEL=stable" >> "$GITHUB_ENV"
+          else
+            echo "CHANNEL=staging" >> "$GITHUB_ENV"
+          fi
+
+      # The one check the development machine cannot do: it has no PHP.
+      - name: Check PHP syntax
+        run: |
+          find livecrafts -name '*.php' -not -path '*/node_modules/*' -print0 \
+            | xargs -0 -P 4 -n 1 php -l > /dev/null
+
+      - name: Build the zip
+        run: bash tools/build-zip.sh
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Publish to Hostinger
+        run: node tools/release/publish.mjs --channel "$CHANNEL"
+
+      - name: Keep the zip with the run
+        uses: actions/upload-artifact@v4
+        with:
+          name: livecrafts-${{ env.CHANNEL }}
+          path: dist/*.zip
+          if-no-files-found: error

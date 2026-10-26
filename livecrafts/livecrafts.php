@@ -2,7 +2,8 @@
 /**
  * Plugin Name: Livecrafts
  * Description: Edit your live site with an AI assistant or by clicking on the page. Every change is saved as a draft that only editors see; visitors see it after you deploy. Edits go into the real source (Elementor, blocks, ACF, Additional CSS) and every change can be reverted.
- * Version: 0.23.0
+ * Version: 1.0.0
+ * Update URI: https://project-in-progress.com/updates/livecrafts
  * Requires at least: 6.2
  * Requires PHP: 7.4
  * Author: Livecrafts
@@ -11,7 +12,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'LIVECRAFTS_VERSION', '0.23.0' );
+define( 'LIVECRAFTS_VERSION', '1.0.0' );
 define( 'LIVECRAFTS_FILE', __FILE__ );
 define( 'LIVECRAFTS_DIR', plugin_dir_path( __FILE__ ) );
 define( 'LIVECRAFTS_URL', plugin_dir_url( __FILE__ ) );
@@ -42,6 +43,7 @@ require_once LIVECRAFTS_DIR . 'includes/templates.php';
 require_once LIVECRAFTS_DIR . 'includes/template-preview.php';
 require_once LIVECRAFTS_DIR . 'includes/theme-files.php';
 require_once LIVECRAFTS_DIR . 'includes/plugin-updates.php';
+require_once LIVECRAFTS_DIR . 'includes/self-update.php';
 require_once LIVECRAFTS_DIR . 'includes/file-changes.php';
 require_once LIVECRAFTS_DIR . 'includes/assistant.php';
 require_once LIVECRAFTS_DIR . 'includes/migrate.php';

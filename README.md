@@ -160,3 +160,46 @@ Elementor (Shortcode widget), blocks, Divi, WPBakery, classic content, and from 
   offline tests, but not yet run on a site with Elementor installed.
 * Block-theme navigation (`wp_navigation`) and template parts are not editable yet; classic menus are.
 * ACF repeaters / flexible content need ACF PRO on the site.
+
+## Releases and update channels
+
+Livecrafts updates itself. A site reads an update feed on Hostinger and then installs the new version from
+wp-admin → Plugins with WordPress's own upgrader (`includes/self-update.php`). The zip only has to be uploaded
+by hand once, for the first version that contains this file.
+
+The feed is static files under `public_html/updates/` on `project-in-progress.com`, one folder per channel:
+
+```
+https://project-in-progress.com/updates/<channel>/livecrafts.json      what the latest version is
+https://project-in-progress.com/updates/<channel>/livecrafts-<ver>.zip the plugin itself
+```
+
+| Branch | Channel | Who follows it |
+| --- | --- | --- |
+| `develop` | - | nobody; install the zip by hand while developing |
+| `staging` | `staging` | test sites |
+| `main` | `stable` | client sites |
+
+Each site picks its channel in **Settings → Livecrafts → Updates** (`stable`, `staging`, or `off` to never be
+offered anything). WordPress asks the feed about twice a day, so a new release is not instant; **Dashboard →
+Updates → Check again**, or "Save and check now" on the settings page, asks immediately. Turning on
+*Enable auto-updates* on the Plugins screen makes a site install new versions by itself - sensible on a test
+site, not on a client's.
+
+### Publishing
+
+Pushing to `staging` or `main` runs `.github/workflows/release.yml`, which checks PHP syntax, builds the zip and
+uploads it with the manifest. It needs two repository secrets: `HOSTINGER_API_TOKEN` (an hPanel API token) and
+`HOSTINGER_USERNAME` (the hosting account).
+
+**Bump `Version:` in `livecrafts/livecrafts.php` for every release.** The header is the only source of truth: the
+zip is named from it, the manifest is built from it, and `tools/release/publish.mjs` refuses to publish a version
+the channel already offers, so a forgotten bump fails the run instead of silently replacing a release.
+
+To build and publish by hand:
+
+```bash
+bash tools/build-zip.sh                                   # or tools/build-zip.ps1 on Windows, with -OutDir dist
+HOSTINGER_API_TOKEN=... HOSTINGER_USERNAME=... HOSTINGER_DOMAIN=project-in-progress.com \
+  node tools/release/publish.mjs --channel staging
+```
