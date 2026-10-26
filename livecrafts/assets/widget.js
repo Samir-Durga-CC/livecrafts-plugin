@@ -160,11 +160,46 @@
 				(byKey[key] = byKey[key] || []).push(el);
 			}
 			Object.keys(tally).forEach(function (k) { if (!best || tally[k] > tally[best]) best = k; });
-			if (!best) return null;
+			if (!best) { var only = measureBrand(); return only ? { brand: only } : null; } // no content box, still a brand
 			var parts = best.split("|");
-			return { container: Number(parts[0]), gutter: Number(parts[1]), viewport: vw, className: containerClass(byKey[best] || []) };
+			return { container: Number(parts[0]), gutter: Number(parts[1]), viewport: vw, className: containerClass(byKey[best] || []), brand: measureBrand() };
 		} catch (e) { return null; }
 	}
+
+	/**
+	 * The site's brand colour, from its own buttons: the filled background its buttons use most (header buttons count
+	 * double), the text colour on it, and their corner radius. A colourful fill beats a grey or black one; a site whose
+	 * buttons are all neutral still gets its dark button colour. null when the page has no filled buttons at all.
+	 */
+	function measureBrand() {
+		try {
+			var tally = {}, info = {}, sel = "a, button, input[type=submit], input[type=button], [class*=btn], [class*=button], [class*=cta]";
+			var els = document.querySelectorAll(sel);
+			for (var i = 0; i < els.length && i < 1500; i++) {
+				var el = els[i];
+				if (el.closest(".lcs, .livecrafts-section, .lcw-root, #wpadminbar")) continue;
+				var cs = getComputedStyle(el);
+				if (cs.display === "none" || cs.visibility === "hidden") continue;
+				var bg = rgba(cs.backgroundColor);
+				if (!bg || bg[3] < 0.9 || cs.backgroundImage !== "none") continue;
+				var r = el.getBoundingClientRect();
+				if (r.height > 120 || r.width > 600) continue; // a coloured band or card, not a button
+				var max = Math.max(bg[0], bg[1], bg[2]), min = Math.min(bg[0], bg[1], bg[2]);
+				if (max - min < 24 && max > 200) continue; // white / light grey: the page, not the brand
+				var hex = toHex(bg), w = el.closest("header, .site-header, #masthead") ? 2 : 1;
+				tally[hex] = (tally[hex] || 0) + w * (max - min < 24 ? 0.01 : 1); // grey/black only when nothing else
+				if (!info[hex]) { var fg = rgba(cs.color); info[hex] = { on: fg ? toHex(fg) : "", radius: Math.round(parseFloat(cs.borderTopLeftRadius) || 0) }; }
+			}
+			var best = null;
+			Object.keys(tally).forEach(function (k) { if (!best || tally[k] > tally[best]) best = k; });
+			return best ? { color: best, on: info[best].on, radius: info[best].radius } : null;
+		} catch (e) { return null; }
+	}
+	function rgba(v) {
+		var m = String(v).match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+))?/);
+		return m ? [Number(m[1]), Number(m[2]), Number(m[3]), m[4] === undefined ? 1 : Number(m[4])] : null;
+	}
+	function toHex(c) { return "#" + c.slice(0, 3).map(function (n) { return ("0" + Math.round(n).toString(16)).slice(-2); }).join(""); }
 
 	/**
 	 * The theme's own class for that box ("wrap", "container"...), when the class ALONE makes it: a bare probe with just
