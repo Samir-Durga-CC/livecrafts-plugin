@@ -109,3 +109,9 @@ html.lcw-media-open .uploader-window { z-index: 2147483005; }
 .lcw-offline ol { margin: 4px 0 0; padding-left: 20px; text-align: left; max-width: 320px; font-size: 13px; }
 .lcw-offline ol li { margin: 0 0 6px; }
 .lcw-offline .lcw-off-note { color: #667085; font-size: 12.5px; }
+
+/* The Section Gallery (0.24): while it is open the panel is a large popup over the dimmed page. */
+.lcw-root.lcw-wide::before { content: ""; position: fixed; inset: 0; background: rgba(15, 18, 28, .55); }
+.lcw-root.lcw-wide .lcw-panel { position: fixed; inset: 4vh 4vw; width: auto; height: auto; max-width: 1240px; margin: 0 auto; bottom: auto; }
+.lcw-root.lcw-wide .lcw-draftbar { display: none; }
+@media (max-width: 720px) { .lcw-root.lcw-wide .lcw-panel { inset: 0; border-radius: 0; } }

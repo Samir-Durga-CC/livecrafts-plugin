@@ -173,6 +173,8 @@ function livecrafts_kinds() {
 		// Text and links inside the modules of a Divi page (divi.php). Target: "<path>:<field>".
 		'divi.text' => livecrafts_divi_kind( 'text' ),
 		'divi.link' => livecrafts_divi_kind( 'link' ),
+		// A whole ready-made section added to a Divi 4 page (the Section Gallery). Target: "<index>" | "end".
+		'divi.insert' => livecrafts_divi_insert_kind(),
 		// Put a whole object back to a recorded state (revert of a change made outside Livecrafts, or of a reset).
 		'object.restore' => array(
 			'object'  => 'any',

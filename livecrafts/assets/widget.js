@@ -309,6 +309,8 @@
 		if (d.type === "lc:pick") { startPick(); }
 		else if (d.type === "lc:cancel-pick") { stopPick(); }
 		else if (d.type === "lc:close") { close(); }
+		// The Section Gallery: the panel becomes a large popup over the dimmed page while the gallery is open (0.24).
+		else if (d.type === "lc:wide") { root.classList.toggle("lcw-wide", !!d.on); }
 		else if (d.type === "lc:tab") { state.tab = d.tab; save(); }
 		else if (d.type === "lc:highlight" && d.selector) {
 			try { var el = document.querySelector(d.selector); if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); outline(el); setTimeout(function () { if (!picking) box.hidden = true; }, 1800); } } catch (x) { /* bad selector */ }

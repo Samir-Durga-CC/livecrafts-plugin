@@ -416,3 +416,74 @@ function livecrafts_divi_prepare( $op, $post_id, $target, $value, array $draft )
 		'summary' => 'Divi ' . $label . ' ' . $what . ': ' . livecrafts_quote( $old ) . ' → ' . livecrafts_quote( $clean ),
 	);
 }
+
+/* ------------------------------------------------------------------ add a whole section (divi.insert, 0.24) */
+//
+// The Section Gallery adds a ready-made section to a Divi 4 page: one Divi section > row > column > Code module that
+// holds the section's HTML (its look is a css.block in Additional CSS). Target: "<index>" among the page's top-level
+// sections (0 = top) or "end". Revert target: "remove:<marker>" - the marker is a class on the new section, so the
+// revert takes away exactly that section even when other changes were made to the page since.
+
+function livecrafts_divi_insert_kind() {
+	return array(
+		'object'  => 'post',
+		'group'   => 'content',
+		'prepare' => function ( $post_id, $target, $value, $draft ) { return livecrafts_divi_insert_prepare( $post_id, $target, $value, $draft ); },
+		'read'    => function ( $data, $target ) { return isset( $data['fields']['content'] ) ? (string) $data['fields']['content'] : ''; },
+		'base'    => function ( $data ) { return isset( $data['fields']['content'] ) ? $data['fields']['content'] : ''; },
+		'apply'   => function ( &$data, $target, $after ) {
+			if ( ! is_string( $after ) || ! livecrafts_divi_has( $after ) ) return livecrafts_bad_value( 'The new page content is not Divi content.' );
+			$data['fields']['content'] = $after;
+			return true;
+		},
+		'landed'  => function ( $copy, $expected ) { return $copy['fields']['content'] === $expected['fields']['content']; },
+		'revert'  => function ( $c ) {
+			$marker = isset( $c['payload']['marker'] ) ? (string) $c['payload']['marker'] : '';
+			return array( 'divi.insert', 'remove:' . $marker, '', array() );
+		},
+	);
+}
+
+/** The new section's shortcode around $html. */
+function livecrafts_divi_section_code( $html, $marker ) {
+	$v = '_builder_version="4.27.0" _module_preset="default" global_colors_info="{}"';
+	return '[et_pb_section fb_built="1" ' . $v . ' custom_padding="0px||0px||true|false" module_class="lcs-host lcs-m-' . $marker . '"]'
+		. '[et_pb_row ' . $v . ' width="100%" max_width="100%" custom_padding="0px||0px||true|false"]'
+		. '[et_pb_column type="4_4" ' . $v . ']'
+		. '[et_pb_code ' . $v . ']' . $html . '[/et_pb_code]'
+		. '[/et_pb_column][/et_pb_row][/et_pb_section]';
+}
+
+function livecrafts_divi_insert_prepare( $post_id, $target, $value, array $draft ) {
+	$content = isset( $draft['fields']['content'] ) ? (string) $draft['fields']['content'] : '';
+	if ( ! livecrafts_divi_has( $content ) ) return livecrafts_bad_value( 'This page is not built with Divi 4 (no Divi sections in its content).' );
+	$top = livecrafts_divi_tree( $content );
+
+	if ( preg_match( '/^remove:([a-z0-9]{8,16})$/', (string) $target, $m ) ) {
+		foreach ( $top as $node ) {
+			if ( $node['tag'] === 'et_pb_section' && strpos( $node['atts'], 'lcs-m-' . $m[1] ) !== false ) {
+				$after = substr( $content, 0, $node['start'] ) . substr( $content, $node['start'] + $node['len'] );
+				return array( 'target' => (string) $target, 'after' => $after, 'payload' => array( 'op' => 'remove', 'marker' => $m[1] ), 'summary' => 'Remove the added section' );
+			}
+		}
+		return new WP_Error( 'livecrafts_no_module', 'That section is not on the page any more.', array( 'status' => 404 ) );
+	}
+
+	if ( ! preg_match( '/^(\d{1,4}|end)$/', (string) $target, $m ) ) return livecrafts_bad_value( 'Where to add: "<index>" among the top-level sections (0 = top of the page) or "end".' );
+	if ( ! is_string( $value ) || trim( $value ) === '' ) return livecrafts_bad_value( 'The section HTML is empty.' );
+	if ( strpos( $value, '[' ) !== false || strpos( $value, ']' ) !== false ) return livecrafts_bad_value( 'The section HTML cannot contain [ or ] (Divi would read them as shortcodes).' );
+	$html = trim( preg_replace( '/\s*\n\s*/', '', wp_kses_post( $value ) ) );
+	if ( $html === '' ) return livecrafts_bad_value( 'Nothing is left of the section after the safety check.' );
+
+	$sections = array_values( array_filter( $top, function ( $n ) { return $n['tag'] === 'et_pb_section'; } ) );
+	$index    = $m[1] === 'end' ? count( $sections ) : min( (int) $m[1], count( $sections ) );
+	$at       = $index < count( $sections ) ? $sections[ $index ]['start'] : strlen( rtrim( $content ) );
+	$marker   = substr( md5( uniqid( 'lcs', true ) . $html ), 0, 10 );
+	$after    = substr( $content, 0, $at ) . livecrafts_divi_section_code( $html, $marker ) . substr( $content, $at );
+	return array(
+		'target'  => (string) $index,
+		'after'   => $after,
+		'payload' => array( 'op' => 'insert', 'marker' => $marker, 'index' => $index ),
+		'summary' => 'Add a section to the Divi page' . ( $index === 0 ? ' (top)' : ' (after section ' . $index . ')' ),
+	);
+}
