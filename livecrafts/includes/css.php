@@ -144,6 +144,12 @@ function livecrafts_css_rule_text( $selector, $media, array $declarations ) {
 	$wrap    = function ( $rule ) use ( $media, $queries ) {
 		return $media !== '' ? '@media ' . $queries[ $media ] . " {\n\t" . str_replace( "\n", "\n\t", $rule ) . "\n}" : $rule;
 	};
+	// An entrance animation needs a duration. animation-name on its own runs in 0s, so the element never visibly moved:
+	// "Entrance animation" was applied, saved, and did nothing. A rule that names an animation gets timing too,
+	// unless it already says otherwise.
+	if ( ! empty( $declarations['animation-name'] ) && $declarations['animation-name'] !== 'none' ) {
+		$declarations += array( 'animation-duration' => '0.7s', 'animation-timing-function' => 'cubic-bezier(0.2, 0.7, 0.2, 1)', 'animation-fill-mode' => 'both' );
+	}
 	$body = '';
 	foreach ( $declarations as $prop => $value ) $body .= "\t" . $prop . ': ' . $value . ";\n";
 	$css = $wrap( $selector . " {\n" . $body . '}' );

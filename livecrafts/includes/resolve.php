@@ -83,6 +83,39 @@ function livecrafts_device_media( $device ) {
 	return $device === 'desktop' ? '' : $device;
 }
 
+/**
+ * The fonts the style panel offers: the site's own first - Elementor's global fonts, then the theme's font families -
+ * so "Font" means fonts this site already loads, not names that would quietly fall back to Arial. "Same as the page"
+ * takes an earlier choice off again.
+ */
+function livecrafts_font_options() {
+	$opts = array( 'inherit' => 'Same as the page' );
+	$add  = function ( $family, $label = '' ) use ( &$opts ) {
+		$family = trim( (string) $family );
+		if ( $family === '' || isset( $opts[ $family ] ) || preg_match( '/[{};<>@\\\\]/', $family ) ) return;
+		$opts[ $family ] = $label !== '' ? $label : trim( explode( ',', $family )[0], " '\"" );
+	};
+	if ( livecrafts_el_active() ) {
+		try {
+			foreach ( (array) \Elementor\Plugin::$instance->kits_manager->get_current_settings( 'system_typography' ) as $f ) {
+				if ( ! empty( $f['typography_font_family'] ) ) $add( $f['typography_font_family'], $f['typography_font_family'] . ( ! empty( $f['title'] ) ? ' (' . $f['title'] . ')' : '' ) );
+			}
+		} catch ( \Throwable $e ) { /* an Elementor without a kit has no global fonts to offer */ }
+	}
+	if ( function_exists( 'wp_get_global_settings' ) ) {
+		$families = wp_get_global_settings( array( 'typography', 'fontFamilies' ) );
+		foreach ( array( 'theme', 'custom' ) as $origin ) {
+			foreach ( (array) ( isset( $families[ $origin ] ) ? $families[ $origin ] : array() ) as $f ) {
+				if ( ! empty( $f['fontFamily'] ) ) $add( $f['fontFamily'], isset( $f['name'] ) ? $f['name'] : '' );
+			}
+		}
+	}
+	$add( 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif', 'System sans-serif' );
+	$add( 'Georgia, "Times New Roman", serif', 'Serif' );
+	$add( 'ui-monospace, Consolas, monospace', 'Monospace' );
+	return $opts;
+}
+
 /** css.rule actions for a selector (style, animation, hide). */
 function livecrafts_css_actions( $selector, $device, $label ) {
 	$media = livecrafts_device_media( $device );
@@ -94,6 +127,7 @@ function livecrafts_css_actions( $selector, $device, $label ) {
 		livecrafts_action( 'css:color', 'style', 'Text colour' . $on, 'color', null, $rule( 'color' ) ),
 		livecrafts_action( 'css:background', 'style', 'Background' . $on, 'color', null, $rule( 'background-color' ) ),
 		livecrafts_action( 'css:font-size', 'style', 'Font size' . $on, 'size', null, $rule( 'font-size' ), array( 'units' => array( 'px', 'rem', 'em', '%' ) ) ),
+		livecrafts_action( 'css:font-family', 'style', 'Font' . $on, 'select', null, $rule( 'font-family' ), array( 'options' => livecrafts_font_options() ) ),
 		livecrafts_action( 'css:font-weight', 'style', 'Font weight' . $on, 'select', null, $rule( 'font-weight' ), array( 'options' => array( '300' => 'Light', '400' => 'Regular', '500' => 'Medium', '600' => 'Semi-bold', '700' => 'Bold', '800' => 'Extra bold' ) ) ),
 		livecrafts_action( 'css:text-align', 'style', 'Alignment' . $on, 'select', null, $rule( 'text-align' ), array( 'options' => array( 'left' => 'Left', 'center' => 'Center', 'right' => 'Right' ) ) ),
 		livecrafts_action( 'css:padding', 'style', 'Inner spacing' . $on, 'spacing', null, $rule( 'padding' ) ),
