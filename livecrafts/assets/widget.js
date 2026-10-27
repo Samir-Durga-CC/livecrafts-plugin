@@ -405,14 +405,20 @@
 	function uniqueSelector(el) {
 		if (el.id && /^[A-Za-z][\w-]*$/.test(el.id) && document.querySelectorAll("#" + el.id).length === 1) return "#" + el.id;
 		var parts = [], cur = el;
-		while (cur && cur.nodeType === 1 && cur !== document.body && parts.length < 5) {
+		// Up to 8 levels: a card title inside a gallery section is 7 deep before anything tells one copy of the
+		// section from another.
+		while (cur && cur.nodeType === 1 && cur !== document.body && parts.length < 8) {
 			var part = cur.tagName.toLowerCase();
 			var cls = Array.prototype.slice.call(cur.classList).filter(function (c) { return /^[A-Za-z_-][\w-]*$/.test(c) && c.indexOf("lcw-") !== 0; }).slice(0, 2);
 			if (cls.length) part += "." + cls.join(".");
 			var parent = cur.parentElement;
 			if (parent) {
 				var same = Array.prototype.filter.call(parent.children, function (c) { return c.tagName === cur.tagName; });
-				if (same.length > 1 && !cls.length) part += ":nth-of-type(" + (same.indexOf(cur) + 1) + ")";
+				// Classes are not enough when siblings share them. Two copies of the same gallery section are identical
+				// down to their class names, so "the second card's title" matched the second card of BOTH, and one red
+				// heading turned two red. A position among the look-alikes tells them apart.
+				var alike = cls.length ? same.filter(function (c) { return cls.every(function (k) { return c.classList.contains(k); }); }) : same;
+				if (alike.length > 1) part += ":nth-of-type(" + (same.indexOf(cur) + 1) + ")";
 			}
 			parts.unshift(part);
 			var sel = parts.join(" > ");
