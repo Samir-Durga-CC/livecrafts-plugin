@@ -47,6 +47,7 @@ function livecrafts_admin_page() {
 		'mismatch' => array( 'error', 'The two passwords are not the same. Nothing was changed.' ),
 		'weak'     => array( 'error', 'The deploy password needs at least 8 characters. Nothing was changed.' ),
 		'legacy'   => array( 'success', 'The old overlay was removed.' ),
+		'channel'  => array( 'success', 'Update channel saved.' ),
 	);
 	$lc = isset( $_GET['lc'] ) ? sanitize_key( $_GET['lc'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification -- display only
 	echo '<div class="wrap"><h1>Livecrafts</h1>';
@@ -97,6 +98,8 @@ function livecrafts_admin_page() {
 		}
 		echo '</tbody></table>';
 	}
+
+	do_action( 'livecrafts_admin_sections' ); // Updates (self-update.php) and anything else that belongs on this page
 
 	echo '<h2 style="margin-top:32px">Recent changes</h2>';
 	$changes = livecrafts_changes_query( array( 'limit' => 25 ) );

@@ -1,0 +1,3 @@
+# The release scripts run on a Linux runner: a CRLF here would fail with "bad interpreter".
+*.sh text eol=lf
+*.mjs text eol=lf
