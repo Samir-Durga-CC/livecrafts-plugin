@@ -92,7 +92,15 @@ function livecrafts_deploy_check( $ids = null ) {
  * underneath a draft (the draft value wins). Returns a result array or WP_Error (nothing written).
  */
 function livecrafts_deploy( $user_id, $notes, array $opts = array() ) {
-	$ids   = ! empty( $opts['ids'] ) ? array_map( 'intval', (array) $opts['ids'] ) : null;
+	$ids = ! empty( $opts['ids'] ) ? array_map( 'intval', (array) $opts['ids'] ) : null;
+	// A hidden ready-made component is taken out of the page rather than deployed as a display:none rule, so the live
+	// site is never left carrying markup nobody can see (lcs-edit.php). Each hide becomes a different change, so a
+	// deploy of named changes follows the swap.
+	foreach ( livecrafts_hide_to_remove( $ids ) as $from => $to ) {
+		if ( $ids === null ) continue;
+		$ids = array_values( array_diff( $ids, array( (int) $from ) ) );
+		if ( $to ) $ids[] = (int) $to;
+	}
 	$check = livecrafts_deploy_check( $ids );
 	$files = livecrafts_files_pending();
 	if ( $ids ) $files = array_values( array_filter( $files, function ( $c ) use ( $ids ) { return in_array( $c['id'], $ids, true ); } ) );
@@ -127,6 +135,10 @@ function livecrafts_deploy( $user_id, $notes, array $opts = array() ) {
 function livecrafts_commit( array $p, $release_id ) {
 	$type = $p['type']; $id = $p['id']; $live = $p['live']; $want = $p['want'];
 	livecrafts_snapshot_save( $type, $id, 'before', $live, $release_id );
+	// One WordPress revision of the page per deploy, so the state before it is in the place people already look for
+	// it - Posts > Edit > Revisions - and not only in Livecrafts' own releases. Elementor and wp_update_post make
+	// revisions of their own while writing; this one marks the whole page as it was, before any of that.
+	if ( $type === 'post' ) wp_save_post_revision( $id );
 
 	livecrafts_writing( true );
 	try {

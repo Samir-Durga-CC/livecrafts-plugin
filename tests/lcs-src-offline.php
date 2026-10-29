@@ -40,7 +40,10 @@ function wp_strip_all_tags( $s ) { return strip_tags( (string) $s ); }
 function wp_kses_post( $s ) { return $s; }
 function esc_url_raw( $u ) { return (string) $u; }
 function absint( $v ) { return abs( (int) $v ); }
-function livecrafts_sanitize_post_field( $field, $value, $post_id ) { return (string) $value; }
+// kinds.php declares livecrafts_sanitize_post_field itself, so stub what WordPress gives it instead.
+function sanitize_post_field( $field, $value, $post_id, $context ) { return (string) $value; }
+function wp_slash( $v ) { return $v; }
+function wp_unslash( $v ) { return $v; }
 function livecrafts_user_can_edit() { return true; }
 function livecrafts_preview_token_request() { return false; }
 function in_the_loop() { return false; }
@@ -53,7 +56,11 @@ function livecrafts_el_active() { return false; }
 if ( ! function_exists( 'mb_substr' ) ) { function mb_substr( $s, $start, $len = null ) { return $len === null ? substr( (string) $s, $start ) : substr( (string) $s, $start, $len ); } }
 if ( ! function_exists( 'mb_strlen' ) ) { function mb_strlen( $s ) { return strlen( (string) $s ); } }
 
+function user_can() { return true; }
+
 require_once __DIR__ . '/../livecrafts/includes/sections.php';
+require_once __DIR__ . '/../livecrafts/includes/css.php';
+require_once __DIR__ . '/../livecrafts/includes/kinds.php';
 require_once __DIR__ . '/../livecrafts/includes/lcs-edit.php';
 
 $fails = 0;
@@ -137,6 +144,30 @@ ok( 'everything around it survives', is_array( $c ) && strpos( $c['after'], '<p>
 
 $w = $page;
 ok( 'writing it back replaces the content', livecrafts_src_write( array( 'content', 5, '' ), $w, $c['after'] ) === true && $w['fields']['content'] === $c['after'] );
+
+/* ------------------------------------------------------------------ hiding a component */
+
+echo "hiding a component is marked for removal on deploy\n";
+$css  = array( 'css' => '' );
+$hide = function ( $decl, $component ) use ( $css ) {
+	return livecrafts_kind_css_rule_prepare( 0, '', array( 'selector' => 'body.page-id-5 section.lcs', 'media' => '', 'declarations' => $decl, 'component' => $component ), $css, array( 'label' => 'Section' ), 1 );
+};
+
+$h = $hide( array( 'display' => 'none' ), '5|theme:end|1' );
+ok( 'a hide carries the component it hides', is_array( $h ) && isset( $h['payload']['lc_hide'] ) && $h['payload']['lc_hide'] === '5|theme:end|1', is_wp_error( $h ) ? $h->get_error_message() : ( is_array( $h ) ? $h['payload'] : null ) );
+ok( 'and says so in the summary', is_array( $h ) && strpos( $h['summary'], 'taken out of the page when deployed' ) !== false );
+
+$e = $hide( array( 'display' => 'none' ), '' );
+ok( 'hiding something that is not a component stays a plain rule', is_array( $e ) && ! isset( $e['payload']['lc_hide'] ) );
+
+$b = $hide( array( 'display' => 'none' ), 'theme:end|1' );
+ok( 'an address without a page is not trusted', is_array( $b ) && ! isset( $b['payload']['lc_hide'] ) );
+
+$m = $hide( array( 'display' => 'none', 'color' => '#fff' ), '5|theme:end|1' );
+ok( 'a rule that also styles is not a removal', is_array( $m ) && ! isset( $m['payload']['lc_hide'] ), is_wp_error( $m ) ? $m->get_error_message() : null );
+
+$s = $hide( array( 'color' => '#fff' ), '5|theme:end|1' );
+ok( 'an ordinary style on a component is untouched', is_array( $s ) && ! isset( $s['payload']['lc_hide'] ) && strpos( $s['summary'], 'Style' ) === 0 );
 
 echo $fails ? "\n$fails failed\n" : "\nall passed\n";
 exit( $fails ? 1 : 0 );

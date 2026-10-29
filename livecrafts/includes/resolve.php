@@ -122,8 +122,14 @@ function livecrafts_font_options() {
 	return $opts;
 }
 
-/** css.rule actions for a selector (style, animation, hide). */
-function livecrafts_css_actions( $selector, $device, $label ) {
+/**
+ * css.rule actions for a selector (style, animation, hide).
+ *
+ * $component is the address of the ready-made component this selector belongs to ("<source>|<section index>"), when
+ * it belongs to one. Hiding it then stays a draft style rule - instant to see, instant to undo - and deploying takes
+ * the component out of the page instead of leaving the rule on the live site (deploy.php).
+ */
+function livecrafts_css_actions( $selector, $device, $label, $component = '' ) {
 	$media = livecrafts_device_media( $device );
 	$on    = $device === 'desktop' ? ' (all screens)' : ' (' . $device . ')';
 	$rule  = function ( $prop ) use ( $selector, $media, $label ) {
@@ -142,7 +148,7 @@ function livecrafts_css_actions( $selector, $device, $label ) {
 		livecrafts_action( 'css:animation', 'motion', 'Entrance animation', 'select', null, $rule( 'animation-name' ), array( 'options' => array(
 			'none' => 'None', 'lc-fade-in' => 'Fade in', 'lc-fade-up' => 'Fade up', 'lc-zoom-in' => 'Zoom in', 'lc-slide-in-left' => 'Slide in from left', 'lc-slide-in-right' => 'Slide in from right' ) ) ),
 	);
-	$hide = array( 'kind' => 'css.rule', 'label' => $label, 'value' => array( 'selector' => $selector, 'media' => $device, 'declarations' => array( 'display' => 'none' ) ) );
+	$hide = array( 'kind' => 'css.rule', 'label' => $label, 'value' => array( 'selector' => $selector, 'media' => $device, 'declarations' => array( 'display' => 'none' ), 'component' => $component ) );
 	$a[]  = livecrafts_action( 'css:hide', 'visibility', 'Hide on ' . $device, 'confirm', null, $hide );
 	return $a;
 }

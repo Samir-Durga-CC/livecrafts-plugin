@@ -156,7 +156,7 @@ function livecrafts_resolve_lcs( $page, $lcs, $device, $selector, $tag ) {
 	if ( $sel !== '' && current_user_can( 'edit_css' ) ) {
 		$own    = ( get_post_type( $page ) === 'page' ? 'body.page-id-' : 'body.postid-' ) . $page . ' ' . $sel;
 		$scopes = array( 'page' => $own, 'site' => $sel );
-		$actions = array_merge( $actions, livecrafts_css_actions( $own, $device, $tag ) );
+		$actions = array_merge( $actions, livecrafts_css_actions( $own, $device, $tag, (int) $page . '|theme:' . $anchor . '|' . (int) $m[2] ) );
 	}
 	$actions[] = livecrafts_action( 'lcs:remove', 'layout', 'Remove this section', 'confirm', null, $change( 'remove' ) );
 	return array(
@@ -331,6 +331,41 @@ function livecrafts_kind_lcs_edit_prepare( $post_id, $target, $value, array $dra
 	return array( 'target' => $target, 'after' => $clean, 'payload' => array( 'src' => $bits[0], 'edit' => $bits[3] ), 'summary' => $r[1] );
 }
 
+/**
+ * Deploying a hidden component takes it out of the page, instead of leaving a display:none rule on the live site.
+ *
+ * Hiding stays a draft style rule on purpose: it shows at once, and one revert brings it back. But a rule that hides
+ * something for good is junk on a live site - the markup is still served to every visitor, the rule grows the site
+ * CSS, and nothing ever cleans either up. So just before a deploy, each hide of a ready-made component is swapped for
+ * the removal of that component, and the rule is dropped with it.
+ *
+ * A component that cannot be removed (it is the only one in its block) keeps its rule, so a deploy is never blocked
+ * by this; a component that has gone already loses the rule, which by then matches nothing.
+ *
+ * $ids limits it to named draft changes (deploying a selection). Returns the swap it made as
+ * array( hide change id => removal change id ), the removal being 0 when the component had already gone.
+ */
+function livecrafts_hide_to_remove( $ids = null ) {
+	$swap = array();
+	foreach ( livecrafts_changes_query( array( 'status' => 'draft', 'kind' => 'css.rule', 'oldest_first' => true, 'limit' => 500 ) ) as $c ) {
+		if ( $ids !== null && ! in_array( (int) $c['id'], (array) $ids, true ) ) continue;
+		$mark = isset( $c['payload']['lc_hide'] ) ? (string) $c['payload']['lc_hide'] : '';
+		$bits = $mark === '' ? array() : explode( '|', $mark );
+		if ( count( $bits ) !== 3 ) continue;
+
+		$r = livecrafts_change_create( 'lcs.edit', 'post', (int) $bits[0], $bits[1] . '|' . (int) $bits[2] . '||remove', '', array(
+			'source' => isset( $c['source'] ) ? $c['source'] : 'widget',
+			'ref'    => isset( $c['ref'] ) ? $c['ref'] : '',
+		) );
+		$gone = is_wp_error( $r ) && $r->get_error_code() === 'livecrafts_stale';
+		if ( is_wp_error( $r ) && ! $gone ) continue; // e.g. the only component in its block: keep the rule
+
+		livecrafts_change_revert( (int) $c['id'] ); // a draft change: dropped, so the rule is never written
+		$swap[ (int) $c['id'] ] = $gone || empty( $r['change']['id'] ) ? 0 : (int) $r['change']['id'];
+	}
+	return $swap;
+}
+
 /** resolve.php: a click on a ready-made component, in whichever store it sits. */
 function livecrafts_resolve_src( $page, $src, $device, $selector, $tag ) {
 	if ( ! preg_match( '#^([a-z]+:[a-z0-9:/_.-]{1,120})\|(\d{1,3})\|(\d{1,3}(?:\.\d{1,3}){0,20})?$#', (string) $src, $m ) ) return null;
@@ -368,7 +403,7 @@ function livecrafts_resolve_src( $page, $src, $device, $selector, $tag ) {
 	if ( $sel !== '' && current_user_can( 'edit_css' ) ) {
 		$own     = ( get_post_type( $page ) === 'page' ? 'body.page-id-' : 'body.postid-' ) . (int) $page . ' ' . $sel;
 		$scopes  = array( 'page' => $own, 'site' => $sel );
-		$actions = array_merge( $actions, livecrafts_css_actions( $own, $device, $tag ) );
+		$actions = array_merge( $actions, livecrafts_css_actions( $own, $device, $tag, (int) $post . '|' . $m[1] . '|' . (int) $m[2] ) );
 	}
 	$actions[] = livecrafts_action( 'lcs:remove', 'layout', 'Remove this section', 'confirm', null, $change( 'remove' ) );
 

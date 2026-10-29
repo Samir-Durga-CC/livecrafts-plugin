@@ -381,6 +381,14 @@ function livecrafts_kind_css_rule_prepare( $object_id, $target, $value, array $d
 	$media = isset( $value['media'] ) ? (string) $value['media'] : '';
 	if ( ! array_key_exists( $media, livecrafts_css_media() ) ) return livecrafts_bad_value( 'media must be empty (all screens), desktop, tablet or mobile.' );
 
+	// Hiding a ready-made component: remember WHICH component, so deploying can take it out of the page for good
+	// instead of leaving a display:none rule behind on the live site (deploy.php). While it is only a draft it stays
+	// an ordinary style rule, which is what makes it instant to see and to undo.
+	$component = isset( $value['component'] ) ? (string) $value['component'] : '';
+	// "<post>|<source>|<section index>" - the post is part of it because a style rule belongs to the site CSS, not
+	// to a page, so the change itself does not say which page the component is on.
+	if ( $component !== '' && ! preg_match( '#^\d{1,10}\|[a-z]+:[A-Za-z0-9:/_.-]{1,120}\|\d{1,3}$#', $component ) ) $component = '';
+
 	$id      = livecrafts_css_rule_id( $selector, $media );
 	$current = livecrafts_css_rule_parse( livecrafts_css_block_get( $draft['css'], $id ) );
 	$decl    = empty( $value['replace'] ) ? $current : array();
@@ -404,11 +412,16 @@ function livecrafts_kind_css_rule_prepare( $object_id, $target, $value, array $d
 	$blocks = livecrafts_css_blocks( $draft['css'] );
 	$label  = ! empty( $args['label'] ) ? (string) $args['label'] : ( isset( $blocks[ $id ] ) && $blocks[ $id ]['label'] !== '' ? $blocks[ $id ]['label'] : $selector );
 	$label  = mb_substr( $label, 0, 80 );
+	$payload = array( 'selector' => $selector, 'media' => $media, 'label' => $label );
+	$only_hidden = isset( $decl['display'] ) && $decl['display'] === 'none' && count( $decl ) === 1;
+	if ( $component !== '' && $only_hidden ) $payload['lc_hide'] = $component;
 	return array(
 		'target'  => $id,
 		'after'   => $decl,
-		'payload' => array( 'selector' => $selector, 'media' => $media, 'label' => $label ),
-		'summary' => 'Style ' . $label . ( $media !== '' ? ' (' . $media . ')' : '' ) . ': ' . ( $changed ? implode( ', ', array_slice( $changed, 0, 6 ) ) : 'reset' ),
+		'payload' => $payload,
+		'summary' => $component !== '' && $only_hidden
+			? 'Hide ' . $label . ( $media !== '' ? ' (' . $media . ')' : '' ) . ' - taken out of the page when deployed'
+			: 'Style ' . $label . ( $media !== '' ? ' (' . $media . ')' : '' ) . ': ' . ( $changed ? implode( ', ', array_slice( $changed, 0, 6 ) ) : 'reset' ),
 	);
 }
 
