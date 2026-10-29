@@ -8,7 +8,8 @@
  * supports are returned, each with the exact change to make (POST /changes), so the widget can apply it directly.
  *
  * Request: { page, device: desktop|tablet|mobile, elementor: {doc, id}, block: "<post>:<path>", menuItem,
- *            src: "<component source>|<section index>|<path>", tag, text, imageSrc, bgImage, href, selector }
+ *            src: "<component source>|<section index>|<path>", acf: "[<post>:]<field name>",
+ *            tag, text, imageSrc, bgImage, href, selector }
  * Answer:  { source: {kind, label, post, ...}, actions: [ {id, group, label, input, value, options?, units?, change,
  *            requires?, note?} ], parent?, css_scopes?, notes: [] }
  *   input  = text | html | url | image | color | size | select | spacing | switch | confirm | ask
@@ -73,6 +74,12 @@ function livecrafts_rest_resolve( WP_REST_Request $req ) {
 	// Older widgets send only "lcs" (a theme-section row).
 	if ( ! $r && $page && (string) $req->get_param( 'lcs' ) !== '' && current_user_can( 'edit_post', $page ) ) {
 		$r = livecrafts_resolve_lcs( $page, (string) $req->get_param( 'lcs' ), $device, (string) $req->get_param( 'selector' ), (string) $req->get_param( 'tag' ) );
+	}
+	// A value the theme printed, where the theme says which field it came from (data-lc-acf). Exact, so it works for
+	// an empty field, for two fields holding the same words, and for a link - none of which text matching can do.
+	if ( ! $r && preg_match( '/^(?:(\d{1,10}):)?([A-Za-z_][A-Za-z0-9_]{0,60})$/', (string) $req->get_param( 'acf' ), $m ) ) {
+		$on = empty( $m[1] ) ? $page : (int) $m[1];
+		if ( $on && current_user_can( 'edit_post', $on ) ) $r = livecrafts_resolve_acf_name( $on, $m[2] );
 	}
 	if ( ! $r && $page && current_user_can( 'edit_post', $page ) ) {
 		$r = livecrafts_resolve_acf( $page, $req );

@@ -308,7 +308,7 @@
 	function resolve(snap) {
 		return wp("POST", "resolve", {
 			page: Number(C.postId) || 0, device: deviceOf(window.innerWidth), elementor: snap.elementor ? { doc: snap.elementor.post, id: snap.elementor.id } : null,
-			block: snap.block || "", divi: snap.divi || "", menuItem: snap.menuItem || 0, lcs: snap.lcs || "", src: snap.src || "", tag: snap.tag, text: snap.rawText || snap.text,
+			block: snap.block || "", divi: snap.divi || "", menuItem: snap.menuItem || 0, lcs: snap.lcs || "", src: snap.src || "", acf: snap.acf || "", tag: snap.tag, text: snap.rawText || snap.text,
 			imageSrc: snap.image ? snap.image.src : "", bgImage: snap.bgImage || "", href: snap.link || "", selector: snap.selector,
 		});
 	}
@@ -389,6 +389,17 @@
 		}
 		return null;
 	}
+	/**
+	 * The ACF field this element was printed from ("[<post>:]<field name>"), when the theme says so (0.25).
+	 * Without it, a value a theme prints is found by matching the clicked text against the page's ACF values, which
+	 * cannot work for a field that is empty (the theme prints its own fallback), for two fields holding the same
+	 * words, or for a link (the browser reports an absolute address). One attribute removes all three.
+	 */
+	function acfOf(el) {
+		var a = el.closest && el.closest("[data-lc-acf]");
+		var v = a && a.getAttribute("data-lc-acf");
+		return v && /^(\d{1,10}:)?[A-Za-z_][A-Za-z0-9_]{0,60}$/.test(v) ? v : "";
+	}
 	/** The classic menu link this element belongs to (WordPress puts menu-item-<id> on each item). */
 	function menuItemOf(el) {
 		var li = el.closest && el.closest("li[class*='menu-item-']");
@@ -426,7 +437,7 @@
 			link: el.closest && el.closest("a") ? el.closest("a").href : "",
 			styles: styles, rect: { width: Math.round(r.width), height: Math.round(r.height) },
 			section: sectionOf(el), pageUrl: location.href.split("#")[0].replace(/[?&]lcv=\d+/, ""), viewport: window.innerWidth,
-			pageKey: C.pageKey || "", elementor: elementorOf(el), hasChildren: hasMarkup(el), block: blockOf(el), divi: diviOf(el), menuItem: menuItemOf(el), lcs: lcsOf(el), src: srcOf(el),
+			pageKey: C.pageKey || "", elementor: elementorOf(el), hasChildren: hasMarkup(el), block: blockOf(el), divi: diviOf(el), menuItem: menuItemOf(el), lcs: lcsOf(el), src: srcOf(el), acf: acfOf(el),
 			similarSelector: similar.selector, similarCount: similar.count,
 		};
 	}
