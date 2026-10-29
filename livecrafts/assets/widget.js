@@ -872,7 +872,11 @@
 			if (args.selector || args.text) { var els = findEls(doc, args); if (els.length) { node = els[0]; target = args.selector || ('text "' + args.text + '"'); } }
 			var whole = node === doc.body;
 			var w = whole ? win.innerWidth : Math.ceil(node.getBoundingClientRect().width);
-			var opts = { scale: Math.min(1, 1400 / Math.max(1, w)), quality: 0.82, backgroundColor: "#ffffff",
+			// timeout: the library otherwise waits out its own 30s default before it gives up on whatever it
+			// could not resolve, and that wait blocks the main thread - long enough that Chrome offers to kill
+			// the tab ("Page Unresponsive"). Measured on a 11800px theme page: 33.7s with the default against
+			// 7.4s at 4s, for a byte-identical JPEG. The wait adds nothing to the picture, so cap it.
+			var opts = { scale: Math.min(1, 1400 / Math.max(1, w)), quality: 0.82, backgroundColor: "#ffffff", timeout: 4000,
 				filter: function (n) { return !(n && n.nodeType === 1 && (n.id === "wpadminbar" || (n.getAttribute && n.getAttribute("data-livecrafts")))); } };
 			// the page: what fits the screen (or the full page); an element: let the library measure it exactly
 			// Painting a copy of the whole page is the slow part: 6000px of a builder page could take longer than the
