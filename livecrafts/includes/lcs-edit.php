@@ -166,3 +166,216 @@ function livecrafts_resolve_lcs( $page, $lcs, $device, $selector, $tag ) {
 		'notes'      => array(),
 	);
 }
+
+/* ------------------------------------------------------------------ the same component, wherever it is stored */
+
+/**
+ * A ready-made component is the same markup whichever builder holds it, but until now only one store said so on the
+ * page: a theme-section row (data-lc-anchor). Everywhere else the identical component could not be picked at all.
+ *
+ * A component address names the store it sits in:
+ *
+ *   theme:<anchor>          a livecrafts_sections row            (sections.php)
+ *   el:<post>:<widget id>   an Elementor widget's markup setting (elementor.php)
+ *   block:<post>:<path>     a block of the page content          (blocks.php)
+ *   divi:<post>:<path>      a Divi module's own content          (divi.php)
+ *   content:<post>          the page content itself
+ *
+ * Every one of those is already addressable on the page: Elementor prints data-id, blocks.php prints data-lc-block,
+ * divi.php prints the lcd-<path> class, sections.php prints data-lc-anchor. The widget reads whichever is nearest
+ * (widget.js srcOf), so nothing new has to be stamped except raw page content, which has no marker of its own.
+ *
+ * The DOM surgery below it is unchanged: livecrafts_lcs_apply() takes markup in and gives markup back. Only reading
+ * and writing that markup differs per store, which is what these functions do.
+ */
+
+/** A component address as array( store, post id, key ), or null. */
+function livecrafts_src_parse( $src, $page ) {
+	$src = (string) $src;
+	if ( strpos( $src, 'theme:' ) === 0 ) {
+		$anchor = livecrafts_sections_clean_anchor( substr( $src, 6 ) );
+		return $anchor ? array( 'theme', (int) $page, $anchor ) : null;
+	}
+	if ( preg_match( '/^content:(\d{1,10})$/', $src, $m ) ) return array( 'content', (int) $m[1], '' );
+	if ( preg_match( '/^el:(\d{1,10}):([A-Za-z0-9]{3,16})$/', $src, $m ) ) return array( 'el', (int) $m[1], $m[2] );
+	if ( preg_match( '/^(block|divi):(\d{1,10}):(\d{1,4}(?:\.\d{1,4}){0,9})$/', $src, $m ) ) return array( $m[1], (int) $m[2], $m[3] );
+	return null;
+}
+
+/**
+ * The setting that holds a widget's own markup. Elementor's Text Editor keeps it in "editor" and its HTML widget in
+ * "html"; the Section Gallery places a Text Editor (place.ts), so that is the default.
+ */
+function livecrafts_src_el_setting( array $node ) {
+	$type = isset( $node['widgetType'] ) ? (string) $node['widgetType'] : '';
+	return $type === 'html' ? 'html' : 'editor';
+}
+
+/** The stored markup of the store a component sits in, read from an object data array. '' when there is none. */
+function livecrafts_src_markup( array $at, array $data ) {
+	list( $store, , $key ) = $at;
+	if ( $store === 'theme' ) {
+		foreach ( (array) ( isset( $data['meta'][ LIVECRAFTS_SECTIONS_META ] ) ? $data['meta'][ LIVECRAFTS_SECTIONS_META ] : array() ) as $row ) {
+			if ( is_array( $row ) && isset( $row['anchor'] ) && $row['anchor'] === $key ) return (string) $row['content'];
+		}
+		return '';
+	}
+	$content = isset( $data['fields']['content'] ) ? (string) $data['fields']['content'] : '';
+	if ( $store === 'content' ) return $content;
+	if ( $store === 'block' ) {
+		$b = livecrafts_block_get( parse_blocks( $content ), $key );
+		return $b && isset( $b['innerHTML'] ) ? (string) $b['innerHTML'] : '';
+	}
+	if ( $store === 'divi' ) {
+		$node = livecrafts_divi_get( livecrafts_divi_tree( $content ), $key );
+		return $node ? (string) livecrafts_divi_field_value( $content, $node, 'text' ) : '';
+	}
+	if ( ! livecrafts_el_active() ) return '';
+	$tree = livecrafts_el_tree( $data );
+	$node = $tree ? livecrafts_el_node( $tree, $key ) : null;
+	if ( ! $node ) return '';
+	$r = livecrafts_el_read( $tree, $key, livecrafts_src_el_setting( $node ) );
+	return is_string( $r['value'] ) ? $r['value'] : '';
+}
+
+/** Put edited markup back where it came from. true, or WP_Error. */
+function livecrafts_src_write( array $at, array &$data, $markup ) {
+	list( $store, , $key ) = $at;
+	$markup = (string) $markup;
+	if ( $store === 'theme' ) {
+		$rows = array();
+		foreach ( (array) ( isset( $data['meta'][ LIVECRAFTS_SECTIONS_META ] ) ? $data['meta'][ LIVECRAFTS_SECTIONS_META ] : array() ) as $row ) {
+			if ( is_array( $row ) && ! empty( $row['anchor'] ) && isset( $row['content'] ) ) $rows[] = array( 'anchor' => (string) $row['anchor'], 'content' => (string) $row['content'] );
+		}
+		$next = livecrafts_sections_set( $rows, $key, $markup );
+		if ( $next ) $data['meta'][ LIVECRAFTS_SECTIONS_META ] = $next; else unset( $data['meta'][ LIVECRAFTS_SECTIONS_META ] );
+		return true;
+	}
+	if ( $store === 'content' ) {
+		$data['fields']['content'] = $markup;
+		return true;
+	}
+	$content = isset( $data['fields']['content'] ) ? (string) $data['fields']['content'] : '';
+	if ( $store === 'block' ) {
+		$blocks = livecrafts_block_edit( parse_blocks( $content ), $key, function ( $b ) use ( $markup ) {
+			return livecrafts_block_set_html( $b, $markup );
+		} );
+		if ( is_wp_error( $blocks ) ) return $blocks;
+		$data['fields']['content'] = serialize_blocks( $blocks );
+		return true;
+	}
+	if ( $store === 'divi' ) {
+		$new = livecrafts_divi_write( $content, $key, 'text', $markup );
+		if ( is_wp_error( $new ) ) return $new;
+		$data['fields']['content'] = $new;
+		return true;
+	}
+	if ( ! livecrafts_el_active() ) return new WP_Error( 'livecrafts_no_elementor', 'Elementor is not active on this site.', array( 'status' => 400 ) );
+	$tree = livecrafts_el_tree( $data );
+	$node = $tree ? livecrafts_el_node( $tree, $key ) : null;
+	if ( ! $node ) return new WP_Error( 'livecrafts_no_element', 'That Elementor element is not on this page any more.', array( 'status' => 404 ) );
+	$r = livecrafts_el_write_tree( $tree, $key, livecrafts_src_el_setting( $node ), $markup );
+	if ( is_wp_error( $r ) ) return $r;
+	livecrafts_el_set_tree( $data, $tree );
+	return true;
+}
+
+/**
+ * The conflict group of an edit, matching the group the store's own kind uses: two people editing the same page
+ * content, or the same widget setting, or the same section row, still conflict with each other.
+ */
+function livecrafts_src_group( $target ) {
+	$src = explode( '|', (string) $target, 2 );
+	$at  = livecrafts_src_parse( $src[0], 0 );
+	if ( ! $at ) return 'target:' . $target;
+	if ( $at[0] === 'theme' ) return 'target:' . $at[2];
+	if ( $at[0] === 'el' ) return 'target:' . $at[2] . ':editor';
+	return 'content';
+}
+
+/** Clean edited markup the way the store it goes back into would. */
+function livecrafts_src_clean( array $at, $markup, $post_id ) {
+	if ( $at[0] === 'divi' ) {
+		$clean = livecrafts_sanitize_post_field( 'post_content', $markup, $post_id );
+		if ( preg_match( '/\[\/?et_pb_/', $clean ) ) return livecrafts_bad_value( 'A Divi module\'s content cannot hold Divi shortcodes.' );
+		return $clean;
+	}
+	if ( $at[0] === 'content' ) return livecrafts_sanitize_post_field( 'post_content', $markup, $post_id );
+	return trim( wp_kses_post( $markup ) );
+}
+
+/**
+ * kind lcs.edit - one text, link or picture inside a ready-made component, wherever the component is stored.
+ * Target: "<src>|<section index>|<path>|<field>" (widget.js srcOf gives the first three).
+ */
+function livecrafts_kind_lcs_edit_prepare( $post_id, $target, $value, array $draft ) {
+	$bits = explode( '|', (string) $target );
+	if ( count( $bits ) !== 4 || ! preg_match( '/^\d{1,3}$/', $bits[1] ) || ! preg_match( '/^(\d{1,3}(\.\d{1,3}){0,20})?$/', $bits[2] ) ) {
+		return new WP_Error( 'livecrafts_bad_target', 'A component edit is "<source>|<section index>|<path>|<field>".', array( 'status' => 400 ) );
+	}
+	$at = livecrafts_src_parse( $bits[0], $post_id );
+	if ( ! $at ) return new WP_Error( 'livecrafts_bad_target', 'That is not a component address: it starts with theme:, el:, block:, divi: or content:.', array( 'status' => 400 ) );
+	if ( $at[1] !== (int) $post_id ) return new WP_Error( 'livecrafts_bad_target', 'That component is stored on another page.', array( 'status' => 400 ) );
+
+	$now = livecrafts_src_markup( $at, $draft );
+	if ( trim( $now ) === '' ) return new WP_Error( 'livecrafts_stale', 'That component is no longer there. Click it again.', array( 'status' => 409 ) );
+
+	$r = livecrafts_lcs_apply( $now, $bits[1], $bits[2], $bits[3], $value );
+	if ( is_wp_error( $r ) ) return $r;
+
+	$clean = livecrafts_src_clean( $at, $r[0], $post_id );
+	if ( is_wp_error( $clean ) ) return $clean;
+	if ( trim( $clean ) === '' ) {
+		return livecrafts_bad_value( 'That is the only component here, so taking it out would leave an empty block. Remove the block itself in the builder.' );
+	}
+	return array( 'target' => $target, 'after' => $clean, 'payload' => array( 'src' => $bits[0], 'edit' => $bits[3] ), 'summary' => $r[1] );
+}
+
+/** resolve.php: a click on a ready-made component, in whichever store it sits. */
+function livecrafts_resolve_src( $page, $src, $device, $selector, $tag ) {
+	if ( ! preg_match( '#^([a-z]+:[a-z0-9:/_.-]{1,120})\|(\d{1,3})\|(\d{1,3}(?:\.\d{1,3}){0,20})?$#', (string) $src, $m ) ) return null;
+	$at = livecrafts_src_parse( $m[1], $page );
+	if ( ! $at || ! current_user_can( 'edit_post', $at[1] ) ) return null;
+
+	$data = livecrafts_draft_data( 'post', $at[1] );
+	if ( is_wp_error( $data ) ) return null;
+	$html = livecrafts_src_markup( $at, $data );
+	if ( trim( $html ) === '' ) return null;
+
+	$path = isset( $m[3] ) ? $m[3] : '';
+	list( , $root ) = livecrafts_lcs_dom( $html );
+	$found = $root ? livecrafts_lcs_find( $root, $m[2], $path ) : null;
+	if ( ! $found ) return null;
+	list( $sec, $node ) = $found;
+	$parts  = livecrafts_lcs_parts( $sec, $node );
+	$name   = (string) $sec->getAttribute( 'data-lcs' );
+	$post   = $at[1];
+	$change = function ( $field ) use ( $post, $m, $path ) {
+		return array( 'kind' => 'lcs.edit', 'post' => (int) $post, 'target' => $m[1] . '|' . (int) $m[2] . '|' . $path . '|' . $field );
+	};
+
+	$actions = array();
+	if ( $parts['text'] ) $actions[] = livecrafts_action( 'lcs:text', 'content', 'Edit text', 'text', trim( preg_replace( '/\s+/u', ' ', $parts['text']->textContent ) ), $change( 'text' ) );
+	if ( $parts['link'] ) $actions[] = livecrafts_action( 'lcs:link', 'content', 'Change link', 'url', (string) $parts['link']->getAttribute( 'href' ), $change( 'link' ) );
+	if ( $parts['image'] ) {
+		$img = $parts['image']->getElementsByTagName( 'img' )->item( 0 );
+		$actions[] = livecrafts_action( 'lcs:image', 'content', $img ? 'Replace picture' : 'Add a picture', 'image', array( 'id' => 0, 'url' => $img ? (string) $img->getAttribute( 'src' ) : '' ), $change( 'image' ) );
+	}
+	$actions[] = livecrafts_action( 'ask', 'content', 'Change it another way (assistant)', 'ask', null, array() );
+
+	$scopes = null;
+	$sel    = livecrafts_css_selector_clean( $selector );
+	if ( $sel !== '' && current_user_can( 'edit_css' ) ) {
+		$own     = ( get_post_type( $page ) === 'page' ? 'body.page-id-' : 'body.postid-' ) . (int) $page . ' ' . $sel;
+		$scopes  = array( 'page' => $own, 'site' => $sel );
+		$actions = array_merge( $actions, livecrafts_css_actions( $own, $device, $tag ) );
+	}
+	$actions[] = livecrafts_action( 'lcs:remove', 'layout', 'Remove this section', 'confirm', null, $change( 'remove' ) );
+
+	return array(
+		'source'     => array( 'kind' => 'section', 'label' => $name !== '' ? 'Section: ' . $name : 'Section', 'post' => (int) $post, 'src' => $m[1], 'where' => livecrafts_object_label( 'post', (int) $post ) ),
+		'actions'    => $actions,
+		'css_scopes' => $scopes,
+		'notes'      => array(),
+	);
+}

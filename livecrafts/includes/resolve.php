@@ -8,7 +8,7 @@
  * supports are returned, each with the exact change to make (POST /changes), so the widget can apply it directly.
  *
  * Request: { page, device: desktop|tablet|mobile, elementor: {doc, id}, block: "<post>:<path>", menuItem,
- *            tag, text, imageSrc, bgImage, href, selector }
+ *            src: "<component source>|<section index>|<path>", tag, text, imageSrc, bgImage, href, selector }
  * Answer:  { source: {kind, label, post, ...}, actions: [ {id, group, label, input, value, options?, units?, change,
  *            requires?, note?} ], parent?, css_scopes?, notes: [] }
  *   input  = text | html | url | image | color | size | select | spacing | switch | confirm | ask
@@ -65,6 +65,12 @@ function livecrafts_rest_resolve( WP_REST_Request $req ) {
 	if ( ! $r && preg_match( '/^(\d+):(\d{1,4}(?:\.\d{1,4}){0,9})$/', (string) $req->get_param( 'divi' ), $m ) && current_user_can( 'edit_post', (int) $m[1] ) ) {
 		$r = livecrafts_resolve_divi( (int) $m[1], $m[2], $device, (string) $req->get_param( 'selector' ), (string) $req->get_param( 'tag' ) );
 	}
+	// A ready-made component, in whichever store it sits (lcs-edit.php). It checks the capability on the post that
+	// really holds the markup, which on an Elementor page can be a template rather than the page being viewed.
+	if ( ! $r && (string) $req->get_param( 'src' ) !== '' ) {
+		$r = livecrafts_resolve_src( $page, (string) $req->get_param( 'src' ), $device, (string) $req->get_param( 'selector' ), (string) $req->get_param( 'tag' ) );
+	}
+	// Older widgets send only "lcs" (a theme-section row).
 	if ( ! $r && $page && (string) $req->get_param( 'lcs' ) !== '' && current_user_can( 'edit_post', $page ) ) {
 		$r = livecrafts_resolve_lcs( $page, (string) $req->get_param( 'lcs' ), $device, (string) $req->get_param( 'selector' ), (string) $req->get_param( 'tag' ) );
 	}

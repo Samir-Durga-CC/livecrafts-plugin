@@ -308,7 +308,7 @@
 	function resolve(snap) {
 		return wp("POST", "resolve", {
 			page: Number(C.postId) || 0, device: deviceOf(window.innerWidth), elementor: snap.elementor ? { doc: snap.elementor.post, id: snap.elementor.id } : null,
-			block: snap.block || "", divi: snap.divi || "", menuItem: snap.menuItem || 0, lcs: snap.lcs || "", tag: snap.tag, text: snap.rawText || snap.text,
+			block: snap.block || "", divi: snap.divi || "", menuItem: snap.menuItem || 0, lcs: snap.lcs || "", src: snap.src || "", tag: snap.tag, text: snap.rawText || snap.text,
 			imageSrc: snap.image ? snap.image.src : "", bgImage: snap.bgImage || "", href: snap.link || "", selector: snap.selector,
 		});
 	}
@@ -332,13 +332,62 @@
 	function lcsOf(el) {
 		var sec = el.closest && el.closest("section.lcs"), host = sec && sec.closest("[data-lc-anchor]");
 		if (!sec || !host) return "";
+		var index = Array.prototype.indexOf.call(host.querySelectorAll("section.lcs"), sec);
+		return host.getAttribute("data-lc-anchor") + "|" + index + "|" + pathTo(el, sec).join(".");
+	}
+	/** Element-child indexes from an ancestor down to el - the same walk the plugin does in the stored markup. */
+	function pathTo(el, root) {
 		var path = [], cur = el;
-		while (cur && cur !== sec) {
+		while (cur && cur !== root) {
 			path.unshift(Array.prototype.indexOf.call(cur.parentElement.children, cur));
 			cur = cur.parentElement;
 		}
-		var index = Array.prototype.indexOf.call(host.querySelectorAll("section.lcs"), sec);
-		return host.getAttribute("data-lc-anchor") + "|" + index + "|" + path.join(".");
+		return path;
+	}
+	/**
+	 * Where the ready-made component under this element is STORED: "<source>|<section index>|<path>" (0.25).
+	 * A component is the same markup whichever builder holds it, and every builder already says on the page where its
+	 * part of the page comes from - Elementor's data-id, data-lc-block, the lcd-<path> class, data-lc-anchor. The
+	 * nearest of those marks the store, so the plugin can find the same element in the stored markup and edit it
+	 * there (resolve.php -> lcs-edit.php), on a theme page, an Elementor page, a block page or a Divi page alike.
+	 */
+	function srcOf(el) {
+		var sec = el.closest && el.closest("section.lcs");
+		var at = sec && storeOf(sec);
+		if (!at) return "";
+		var all = [], i, j;
+		for (i = 0; i < at.hosts.length; i++) {
+			var list = at.hosts[i].querySelectorAll("section.lcs");
+			for (j = 0; j < list.length; j++) all.push(list[j]);
+		}
+		var index = all.indexOf(sec);
+		if (index < 0) return "";
+		return at.src + "|" + index + "|" + pathTo(el, sec).join(".");
+	}
+	/**
+	 * The store a component sits in, and every element of the page that shares that store - the section index is
+	 * counted across all of them, because the plugin counts across the whole stored value. Only raw page content has
+	 * more than one host element on a page; the other stores are one element each.
+	 */
+	function storeOf(sec) {
+		for (var n = sec; n && n.nodeType === 1 && n !== document.body; n = n.parentElement) {
+			// Raw page content: nothing of WordPress's own says "this came from post_content", so sections.php stamps it.
+			var own = n.getAttribute("data-lc-src");
+			if (own && /^[a-z]+:[A-Za-z0-9:/_.-]{1,120}$/.test(own)) {
+				return { src: own, hosts: document.querySelectorAll('[data-lc-src="' + own + '"]') };
+			}
+			var block = n.getAttribute("data-lc-block"); // "<post>:<path>", from blocks.php
+			if (block && /^\d+:\d+(\.\d+)*$/.test(block)) return { src: "block:" + block, hosts: [n] };
+			var divi = /(?:^|\s)lcd-(\d+(?:-\d+)*)(?:\s|$)/.exec(n.className || ""); // from divi.php
+			if (divi) return { src: "divi:" + (Number(C.postId) || 0) + ":" + divi[1].split("-").join("."), hosts: [n] };
+			if (n.classList && n.classList.contains("elementor-element") && n.getAttribute("data-id")) {
+				var doc = n.closest("[data-elementor-id]");
+				if (doc) return { src: "el:" + (Number(doc.getAttribute("data-elementor-id")) || 0) + ":" + n.getAttribute("data-id"), hosts: [n] };
+			}
+			var anchor = n.getAttribute("data-lc-anchor"); // from sections.php
+			if (anchor) return { src: "theme:" + anchor, hosts: [n] };
+		}
+		return null;
 	}
 	/** The classic menu link this element belongs to (WordPress puts menu-item-<id> on each item). */
 	function menuItemOf(el) {
@@ -377,7 +426,7 @@
 			link: el.closest && el.closest("a") ? el.closest("a").href : "",
 			styles: styles, rect: { width: Math.round(r.width), height: Math.round(r.height) },
 			section: sectionOf(el), pageUrl: location.href.split("#")[0].replace(/[?&]lcv=\d+/, ""), viewport: window.innerWidth,
-			pageKey: C.pageKey || "", elementor: elementorOf(el), hasChildren: hasMarkup(el), block: blockOf(el), divi: diviOf(el), menuItem: menuItemOf(el), lcs: lcsOf(el),
+			pageKey: C.pageKey || "", elementor: elementorOf(el), hasChildren: hasMarkup(el), block: blockOf(el), divi: diviOf(el), menuItem: menuItemOf(el), lcs: lcsOf(el), src: srcOf(el),
 			similarSelector: similar.selector, similarCount: similar.count,
 		};
 	}

@@ -142,6 +142,23 @@ function livecrafts_kinds() {
 		),
 		// A section Livecrafts renders inside a page the THEME builds (sections.php). Target = where it goes
 		// ("before:template-parts/why", "after:...", "start", "end"); value = the markup, '' removes it.
+		// One text, link or picture inside a ready-made component, in whichever store the component sits
+		// (lcs-edit.php). Target = "<source>|<section index>|<path>|<field>"; the whole stored markup of that
+		// source is what gets written, so revert puts the markup back verbatim.
+		'lcs.edit' => array(
+			'object'  => 'post',
+			'group'   => function ( $target ) { return livecrafts_src_group( $target ); },
+			'prepare' => 'livecrafts_kind_lcs_edit_prepare',
+			'read'    => function ( $data, $target ) {
+				$at = livecrafts_src_parse( explode( '|', (string) $target, 2 )[0], 0 );
+				return $at ? livecrafts_src_markup( $at, $data ) : '';
+			},
+			'apply'   => function ( &$data, $target, $after ) {
+				$at = livecrafts_src_parse( explode( '|', (string) $target, 2 )[0], 0 );
+				if ( ! $at ) return livecrafts_bad_value( 'That is not a component address.' );
+				return livecrafts_src_write( $at, $data, $after );
+			},
+		),
 		'theme.section' => array(
 			'object'  => 'post',
 			'prepare' => 'livecrafts_kind_theme_section_prepare',

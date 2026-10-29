@@ -194,6 +194,20 @@ function livecrafts_lcs_fit( $html ) {
 add_filter( 'the_content', 'livecrafts_lcs_fit', 99 );
 add_filter( 'elementor/frontend/the_content', 'livecrafts_lcs_fit', 99 );
 
+/**
+ * Raw page content is the one store that says nothing about itself on the page: Elementor prints data-id, blocks.php
+ * prints data-lc-block, divi.php prints the lcd-<path> class and sections.php prints data-lc-anchor, but a component
+ * written straight into post_content has no marker at all - so a click on it could not be traced back to its source.
+ * Stamp the component wrappers for editors, and leave block content alone because its blocks are already marked.
+ */
+add_filter( 'the_content', function ( $content ) {
+	if ( ! livecrafts_user_can_edit() && ! livecrafts_preview_token_request() ) return $content;
+	if ( ! in_the_loop() || ! is_main_query() || strpos( (string) $content, 'lcs-host' ) === false || has_blocks( $content ) ) return $content;
+	$post_id = (int) get_the_ID();
+	if ( ! $post_id || $post_id !== (int) get_queried_object_id() ) return $content;
+	return preg_replace( '/class="lcs-host(?=[\s"])/', 'data-lc-src="content:' . $post_id . '" class="lcs-host', (string) $content );
+}, 98 );
+
 function livecrafts_rest_sections_site_get() {
 	return array( 'ok' => true, 'containerClass' => livecrafts_lcs_container() );
 }
