@@ -874,12 +874,20 @@
 			howToRead: "computed = what the visitor sees. rules = every CSS rule that sets those properties, in cascade order (later ones win unless !important). Edit the rule in `file`, or use style_patch." };
 	}
 	function eyesRead(doc) {
+		// Only what a visitor can see. A section hidden by CSS (an old theme hero replaced by a new one) is still in the
+		// HTML: listing its heading as if it were on the page made an edit to the hidden copy look like it worked.
+		var shown = function (el) { return el.checkVisibility ? el.checkVisibility({ visibilityProperty: true }) : el.offsetParent !== null; };
+		var heading = function (h) { return { tag: h.tagName.toLowerCase(), text: norm(h.textContent).slice(0, 160) }; };
+		var all = Array.prototype.filter.call(doc.querySelectorAll("h1,h2,h3"), function (h) { return !h.closest(CHROME); });
+		var hidden = all.filter(function (h) { return !shown(h); }).slice(0, 20).map(heading);
 		return {
 			ok: true, url: doc.location.href.replace(/[?&]lcprobe=\d+/, ""), title: doc.title,
-			headings: Array.prototype.slice.call(doc.querySelectorAll("h1,h2,h3"), 0, 40).filter(function (h) { return !h.closest(CHROME); }).map(function (h) { return { tag: h.tagName.toLowerCase(), text: norm(h.textContent).slice(0, 160) }; }),
+			headings: all.filter(shown).slice(0, 40).map(heading),
+			hiddenHeadings: hidden,
 			text: String(doc.body.innerText || "").replace(/\n{3,}/g, "\n\n").slice(0, 15000),
-			images: Array.prototype.slice.call(doc.images, 0, 30).filter(function (i) { return !i.closest(CHROME); }).map(function (i) { return { src: i.currentSrc || i.src, alt: i.alt, width: i.naturalWidth, height: i.naturalHeight }; }),
-			links: Array.prototype.slice.call(doc.querySelectorAll("a[href]"), 0, 50).filter(function (l) { return !l.closest(CHROME); }).map(function (l) { return { text: norm(l.textContent).slice(0, 60), href: l.href }; }),
+			images: Array.prototype.filter.call(doc.images, function (i) { return !i.closest(CHROME) && shown(i); }).slice(0, 30).map(function (i) { return { src: i.currentSrc || i.src, alt: i.alt, width: i.naturalWidth, height: i.naturalHeight }; }),
+			links: Array.prototype.filter.call(doc.querySelectorAll("a[href]"), function (l) { return !l.closest(CHROME) && shown(l); }).slice(0, 50).map(function (l) { return { text: norm(l.textContent).slice(0, 60), href: l.href }; }),
+			note: hidden.length ? "hiddenHeadings are in the HTML but NOT shown to visitors (display:none, e.g. a section replaced by another). Editing them changes nothing anyone sees: edit the visible element instead." : undefined,
 		};
 	}
 	function eyesDesign(doc, win) {
