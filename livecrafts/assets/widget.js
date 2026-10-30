@@ -808,7 +808,10 @@
 		return new Promise(function (resolve, reject) {
 			var f = document.createElement("iframe");
 			f.name = "lcw-probe"; f.setAttribute("data-livecrafts", "probe"); f.setAttribute("aria-hidden", "true");
-			f.style.cssText = "position:fixed;left:-30000px;top:0;width:" + (DEVW[device] || 1366) + "px;height:900px;border:0;opacity:0;pointer-events:none";
+			// In the window, under everything and fully transparent - not parked off-screen. Off-screen, the browser
+			// never loads lazy images and never fires the page's scroll reveals in the copy: screenshots waited out the
+			// full timeout (5s instead of 0.8s on the custom-theme home page) and came back with blank sections.
+			f.style.cssText = "position:fixed;left:0;top:0;width:" + (DEVW[device] || 1366) + "px;height:900px;border:0;opacity:0;pointer-events:none;z-index:-2147483647";
 			var done = false;
 			var fail = function (msg) { if (done) return; done = true; f.remove(); reject(new Error(msg)); };
 			// A heavy page (a builder home page with lazy images) needs more than 25s on a slow connection; the backend
@@ -934,24 +937,62 @@
 		});
 		return shotLib;
 	}
+	/**
+	 * Scroll the hidden copy down to `bottom` and back. Themes fade sections in as they scroll into view (opacity 0 until an
+	 * IntersectionObserver fires); nobody scrolls the copy, so a picture of anything below the first screen came out blank.
+	 * The observer only counts what is inside the person's window, so a step is never taller than that window.
+	 */
+	function revealDown(win, bottom) {
+		var step = Math.max(200, Math.min(win.innerHeight, window.innerHeight) - 100), y = 0;
+		// Observers report after the copy has painted: wait two frames. A tab in the background paints no frames, so
+		// give up on them after a moment - the picture may then miss a reveal, but the look never hangs.
+		var wait = function () { return new Promise(function (r) { setTimeout(r, 250); win.requestAnimationFrame(function () { win.requestAnimationFrame(function () { setTimeout(r, 30); }); }); }); };
+		// "instant": a theme with scroll-behavior:smooth (this one) turns a plain scrollTo into an animation, and the copy
+		// is captured before it has moved at all.
+		var to = function (top) { win.scrollTo({ top: top, left: 0, behavior: "instant" }); };
+		var next = function () {
+			if (y >= bottom) { to(0); return wait(); }
+			y += step; to(y);
+			return wait().then(next);
+		};
+		return bottom > win.innerHeight ? next() : Promise.resolve();
+	}
 	function eyesScreenshot(doc, win, args, device) {
 		return loadShotLib().then(function (lib) {
 			var node = doc.body, target = "page";
 			if (args.selector || args.text) { var els = findEls(doc, args); if (els.length) { node = els[0]; target = args.selector || ('text "' + args.text + '"'); } }
 			var whole = node === doc.body;
 			var w = whole ? win.innerWidth : Math.ceil(node.getBoundingClientRect().width);
+			// The copy is painted on the person's own tab, on its main thread. Freeze the page's animations (a slider, scroll
+			// reveals) so they stop repainting the hidden copy, and leave out everything outside the picture: every image
+			// in the copy is embedded and decoded while painting, below the cut too. Measured on the custom-theme home
+			// page: the longest freeze of a one-screen shot went from 1.77s to 0.38s, the picture is the same.
+			var still = doc.createElement("style");
+			still.setAttribute("data-livecrafts", "still");
+			still.textContent = "*,*::before,*::after{animation:none !important;transition:none !important}";
+			(doc.head || doc.documentElement).appendChild(still);
+			var height = Math.max(1, Math.min(doc.documentElement.scrollHeight, args.fullPage ? 3500 : win.innerHeight));
+			var box = whole ? { top: 0, bottom: height } : node.getBoundingClientRect();
+			var inPicture = function (n) {
+				if (!n || n.nodeType !== 1 || n === node || !n.getBoundingClientRect) return true;
+				var r = n.getBoundingClientRect();
+				return r.bottom >= box.top && r.top <= box.bottom;
+			};
 			// timeout: the library otherwise waits out its own 30s default before it gives up on whatever it
 			// could not resolve, and that wait blocks the main thread - long enough that Chrome offers to kill
 			// the tab ("Page Unresponsive"). Measured on a 11800px theme page: 33.7s with the default against
 			// 7.4s at 4s, for a byte-identical JPEG. The wait adds nothing to the picture, so cap it.
 			var opts = { scale: Math.min(1, 1400 / Math.max(1, w)), quality: 0.82, backgroundColor: "#ffffff", timeout: 4000,
-				filter: function (n) { return !(n && n.nodeType === 1 && (n.id === "wpadminbar" || (n.getAttribute && n.getAttribute("data-livecrafts")))); } };
+				filter: function (n) { return !(n && n.nodeType === 1 && (n.id === "wpadminbar" || (n.getAttribute && n.getAttribute("data-livecrafts")))) && inPicture(n); } };
 			// the page: what fits the screen (or the full page); an element: let the library measure it exactly
 			// Painting a copy of the whole page is the slow part: 6000px of a builder page could take longer than the
 			// request was allowed to. 3500px is about four screens - enough to judge a section in place.
-			if (whole) { opts.width = w; opts.height = Math.max(1, Math.min(doc.documentElement.scrollHeight, args.fullPage ? 3500 : win.innerHeight)); }
+			if (whole) { opts.width = w; opts.height = height; }
 			else opts.style = { margin: "0" }; // the copy must not pick up default margins (they push the content out of the picture)
-			return lib.domToJpeg(node, opts).then(function (dataUrl) {
+			return revealDown(win, whole ? height : box.bottom + win.scrollY).then(function () {
+				if (!whole) box = node.getBoundingClientRect(); // scrolled back to the top: same place, measured again to be sure
+				return lib.domToJpeg(node, opts);
+			}).then(function (dataUrl) {
 				return { ok: true, image: dataUrl, device: device, target: target, url: doc.location.href.replace(/[?&]lcprobe=\d+/, ""), note: "Captured in the person's own browser." };
 			});
 		});
