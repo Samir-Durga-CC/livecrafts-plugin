@@ -40,12 +40,12 @@ jobs:
       HOSTINGER_DOMAIN: project-in-progress.com
       CHANNEL: ${{ github.ref_name == 'main' && 'stable' || 'staging' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Build the zip
         run: bash tools/build-zip.sh
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
 
@@ -60,7 +60,7 @@ jobs:
           echo "The $CHANNEL channel offers $v."
 
       - name: Keep the zip with the run
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: livecrafts-${{ env.CHANNEL }}
           path: dist/*.zip
