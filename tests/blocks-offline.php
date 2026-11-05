@@ -25,6 +25,8 @@ require "$wpinc/class-wp-block-parser-block.php";
 require "$wpinc/class-wp-block-parser-frame.php";
 require "$wpinc/class-wp-block-parser.php";
 foreach ( array( 'class-wp-html-attribute-token', 'class-wp-html-span', 'class-wp-html-text-replacement', 'class-wp-html-decoder', 'class-wp-html-tag-processor' ) as $f ) if ( file_exists( "$wpinc/html-api/$f.php" ) ) require "$wpinc/html-api/$f.php";
+// PHP 7.4 has no str_starts_with (WordPress adds it in compat.php, which this test does not load)
+if ( ! function_exists( 'str_starts_with' ) ) { function str_starts_with( $h, $n ) { return '' === $n || 0 === strncmp( (string) $h, $n, strlen( $n ) ); } }
 // the few functions of wp-includes/blocks.php we need
 function parse_blocks( $c ) { $p = new WP_Block_Parser(); return $p->parse( $c ); }
 function strip_core_block_namespace( $n = null ) { return is_string( $n ) && str_starts_with( $n, 'core/' ) ? substr( $n, 5 ) : $n; }
