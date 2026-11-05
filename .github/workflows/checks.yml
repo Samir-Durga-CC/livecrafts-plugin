@@ -1,7 +1,8 @@
 name: Checks
 
 # Every push to a working branch and every pull request. staging and main run the same checks from release.yml
-# before anything is published.
+# before anything is published. Every error becomes an annotation (file, line, or the test's last lines), so it is
+# readable on the run page without opening the log.
 on:
   push:
     branches-ignore: [staging, main]
@@ -29,22 +30,14 @@ jobs:
 
       # The one check the development machine cannot do: it has no PHP.
       - name: PHP syntax (7.4)
-        run: |
-          find livecrafts -name '*.php' -not -path '*/node_modules/*' -print0 \
-            | xargs -0 -P 4 -n 1 php -l > /dev/null
+        run: bash tools/ci/php-lint.sh
 
+      # All tests run, even after one fails. The block test reads WordPress's own parser from a fresh download.
       - name: Offline tests (no database, no site)
-        run: |
-          set -e
-          for t in acf-rows elementor file-changes lcs-src; do
-            echo "::group::$t"; php "tests/$t-offline.php"; echo "::endgroup::"
-          done
-
-      # The block parser test reads WordPress's own wp-includes.
-      - name: Offline block test (with WordPress's parser)
+        if: always()
         run: |
           curl -fsSL https://wordpress.org/latest.tar.gz | tar -xz -C "$RUNNER_TEMP"
-          php tests/blocks-offline.php "$RUNNER_TEMP/wordpress"
+          bash tools/ci/offline-tests.sh "$RUNNER_TEMP/wordpress"
 
   php-latest:
     # The newest PHP too: a host upgrading PHP must not break the plugin.
@@ -57,9 +50,7 @@ jobs:
           php-version: '8.3'
           coverage: none
       - name: PHP syntax (8.3)
-        run: |
-          find livecrafts -name '*.php' -not -path '*/node_modules/*' -print0 \
-            | xargs -0 -P 4 -n 1 php -l > /dev/null
+        run: bash tools/ci/php-lint.sh
 
   zip:
     runs-on: ubuntu-latest
