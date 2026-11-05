@@ -1,0 +1,75 @@
+name: Checks
+
+# Every push to a working branch and every pull request. staging and main run the same checks from release.yml
+# before anything is published.
+on:
+  push:
+    branches-ignore: [staging, main]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  php:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.4'   # the oldest PHP the plugin header promises ("Requires PHP: 7.4")
+          coverage: none
+
+      # The one check the development machine cannot do: it has no PHP.
+      - name: PHP syntax (7.4)
+        run: |
+          find livecrafts -name '*.php' -not -path '*/node_modules/*' -print0 \
+            | xargs -0 -P 4 -n 1 php -l > /dev/null
+
+      - name: Offline tests (no database, no site)
+        run: |
+          set -e
+          for t in acf-rows elementor file-changes lcs-src; do
+            echo "::group::$t"; php "tests/$t-offline.php"; echo "::endgroup::"
+          done
+
+      # The block parser test reads WordPress's own wp-includes.
+      - name: Offline block test (with WordPress's parser)
+        run: |
+          curl -fsSL https://wordpress.org/latest.tar.gz | tar -xz -C "$RUNNER_TEMP"
+          php tests/blocks-offline.php "$RUNNER_TEMP/wordpress"
+
+  php-latest:
+    # The newest PHP too: a host upgrading PHP must not break the plugin.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+      - name: PHP syntax (8.3)
+        run: |
+          find livecrafts -name '*.php' -not -path '*/node_modules/*' -print0 \
+            | xargs -0 -P 4 -n 1 php -l > /dev/null
+
+  zip:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the zip
+        run: bash tools/build-zip.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: livecrafts-zip
+          path: dist/*.zip
+          if-no-files-found: error

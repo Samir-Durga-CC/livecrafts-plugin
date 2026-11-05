@@ -1,15 +1,21 @@
 name: Publish update feed
 
-# staging -> the staging channel (test sites), main -> the stable channel (client sites).
-# Nothing is published unless "Version:" in livecrafts/livecrafts.php changed: publish.mjs refuses a version the
-# channel already offers, which is what stops a release going out twice under one number.
+# staging -> the staging channel (test sites), main -> the stable channel (client sites). The checks run first.
+#
+# A release is a new "Version:" in livecrafts/livecrafts.php. A push that does not change it publishes nothing: the
+# run says so in a notice and stays green, so ordinary commits to staging are not red runs.
+#
+# Each channel is a GitHub Environment (Settings -> Environments: "staging" and "stable") holding:
+#   secret   HOSTINGER_API_TOKEN   an hPanel API token
+#   variable HOSTINGER_USERNAME    the hosting account, e.g. u815763759
+# Give "stable" required reviewers so a release to client sites waits for a person's yes.
 on:
   push:
     branches: [staging, main]
     paths:
       - 'livecrafts/**'
       - 'tools/**'
-      - '.github/workflows/release.yml'
+      - '.github/workflows/**'
   workflow_dispatch:
 
 permissions:
@@ -20,38 +26,38 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  checks:
+    uses: ./.github/workflows/checks.yml
+
   publish:
+    needs: checks
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ${{ github.ref_name == 'main' && 'stable' || 'staging' }}
     env:
       HOSTINGER_API_TOKEN: ${{ secrets.HOSTINGER_API_TOKEN }}
-      HOSTINGER_USERNAME: ${{ secrets.HOSTINGER_USERNAME }}
+      HOSTINGER_USERNAME: ${{ vars.HOSTINGER_USERNAME || secrets.HOSTINGER_USERNAME }}
       HOSTINGER_DOMAIN: project-in-progress.com
+      CHANNEL: ${{ github.ref_name == 'main' && 'stable' || 'staging' }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Pick the channel
-        run: |
-          if [ "${{ github.ref_name }}" = "main" ]; then
-            echo "CHANNEL=stable" >> "$GITHUB_ENV"
-          else
-            echo "CHANNEL=staging" >> "$GITHUB_ENV"
-          fi
-
-      # The one check the development machine cannot do: it has no PHP.
-      - name: Check PHP syntax
-        run: |
-          find livecrafts -name '*.php' -not -path '*/node_modules/*' -print0 \
-            | xargs -0 -P 4 -n 1 php -l > /dev/null
 
       - name: Build the zip
         run: bash tools/build-zip.sh
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Publish to Hostinger
-        run: node tools/release/publish.mjs --channel "$CHANNEL"
+        run: node tools/release/publish.mjs --channel "$CHANNEL" --skip-if-published
+
+      - name: The feed offers it
+        run: |
+          v=$(sed -n 's/^[[:space:]]*\*[[:space:]]*Version:[[:space:]]*\(.*\)$/\1/p' livecrafts/livecrafts.php | head -1)
+          got=$(curl -fsSL "https://project-in-progress.com/updates/$CHANNEL/livecrafts.json?t=$(date +%s)" | node -pe 'JSON.parse(require("fs").readFileSync(0)).version')
+          [ "$got" = "$v" ] || { echo "::error::The $CHANNEL feed offers $got, not $v."; exit 1; }
+          echo "The $CHANNEL channel offers $v."
 
       - name: Keep the zip with the run
         uses: actions/upload-artifact@v4

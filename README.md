@@ -188,13 +188,18 @@ site, not on a client's.
 
 ### Publishing
 
-Pushing to `staging` or `main` runs `.github/workflows/release.yml`, which checks PHP syntax, builds the zip and
-uploads it with the manifest. It needs two repository secrets: `HOSTINGER_API_TOKEN` (an hPanel API token) and
-`HOSTINGER_USERNAME` (the hosting account).
+Every push to a working branch, and every pull request, runs `.github/workflows/checks.yml`: PHP syntax on PHP 7.4
+(the oldest the header promises) and 8.3, the offline tests (the block test against a fresh WordPress download), and
+the zip build. Pushing to `staging` or `main` runs `.github/workflows/release.yml`: the same checks, then the zip and
+manifest are uploaded to the channel, then the run reads the feed back to prove it offers the new version.
+
+One-time setup in GitHub → Settings → Environments, for `staging` and `stable`: secret `HOSTINGER_API_TOKEN` (an hPanel
+API token) and variable `HOSTINGER_USERNAME` (the hosting account). Give `stable` required reviewers, so a release to
+client sites waits for a person.
 
 **Bump `Version:` in `livecrafts/livecrafts.php` for every release.** The header is the only source of truth: the
-zip is named from it, the manifest is built from it, and `tools/release/publish.mjs` refuses to publish a version
-the channel already offers, so a forgotten bump fails the run instead of silently replacing a release.
+zip is named from it and the manifest is built from it. A push that does not change it publishes nothing - the run
+says so in a notice and stays green - and a release is never replaced under the same number.
 
 To build and publish by hand:
 

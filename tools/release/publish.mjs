@@ -59,7 +59,11 @@ async function published() {
 }
 
 const current = await published();
-if (current?.version === version) {
+// In CI every push to staging/main runs this; a push that is not a release must not be a red run. (It ends by
+// running out, not by process.exit: on Windows that aborts Node while fetch's connections are still closing.)
+const skip = current?.version === version && process.argv.includes("--skip-if-published");
+if (skip) console.log(`::notice::The ${channel} channel already offers ${version} - nothing published. Bump "Version:" in livecrafts/livecrafts.php to release.`);
+else if (current?.version === version) {
   die(`The ${channel} channel already offers ${version}. Bump "Version:" in livecrafts/livecrafts.php before publishing again.`);
 }
 
@@ -104,8 +108,10 @@ const manifest = {
   ...(changelog ? { sections: { changelog: `<pre>${changelog.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" })[c])}</pre>` } } : {}),
 };
 
-console.log(`Publishing Livecrafts ${version} to the ${channel} channel${current?.version ? ` (was ${current.version})` : ""}:`);
-const creds = await uploadCredentials();
-await upload(creds, `updates/${channel}/livecrafts-${version}.zip`, fs.readFileSync(zip));
-await upload(creds, `updates/${channel}/livecrafts.json`, Buffer.from(JSON.stringify(manifest, null, 2), "utf8"));
-console.log(`Done. Sites on the ${channel} channel will be offered ${version}.`);
+if (!skip) {
+  console.log(`Publishing Livecrafts ${version} to the ${channel} channel${current?.version ? ` (was ${current.version})` : ""}:`);
+  const creds = await uploadCredentials();
+  await upload(creds, `updates/${channel}/livecrafts-${version}.zip`, fs.readFileSync(zip));
+  await upload(creds, `updates/${channel}/livecrafts.json`, Buffer.from(JSON.stringify(manifest, null, 2), "utf8"));
+  console.log(`Done. Sites on the ${channel} channel will be offered ${version}.`);
+}
