@@ -14,7 +14,7 @@ const LIVECRAFTS_ASSISTANT_OPT = 'livecrafts_assistant';
 function livecrafts_assistant_defaults() {
 	return array(
 		'enabled'        => 1,
-		'backend_url'    => 'http://127.0.0.1:8790',
+		'backend_url'    => 'https://livecrafts-staging.project-in-progress.com',
 		'bot_name'       => 'Livecrafts',
 		'welcome'        => 'Hi! Tell me what you would like to change on this page - text, images, colours, new sections or pages.',
 		'instructions'   => '',
@@ -86,7 +86,7 @@ function livecrafts_assistant_page() {
 			<h2 class="title">Connection</h2>
 			<table class="form-table" role="presentation">
 				<tr><th scope="row"><label for="lc-backend">Livecrafts backend address</label></th><td><input id="lc-backend" class="regular-text code" name="<?php echo esc_attr( $n ); ?>[backend_url]" value="<?php echo esc_attr( $a['backend_url'] ); ?>">
-					<p class="description">Where the Livecrafts app runs. On your own computer: <code>http://127.0.0.1:8790</code>.</p></td></tr>
+					<p class="description">Where the Livecrafts app runs. The hosted app: <code>https://livecrafts-staging.project-in-progress.com</code>. On your own computer: <code>http://127.0.0.1:8790</code>.</p></td></tr>
 			</table>
 			<?php submit_button(); ?>
 		</form>
